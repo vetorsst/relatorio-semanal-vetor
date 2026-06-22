@@ -187,6 +187,30 @@ body.editing .ctrl{display:inline-flex}
 .addsection:hover{border-color:var(--amber);color:var(--amber)}
 body:not(.editing) .addsection{display:none}
 
+/* ---------- Monte Carlo ---------- */
+.mc-box{border:1px solid var(--line);border-radius:13px;padding:22px;margin-top:14px;background:#fcfdfd}
+.mc-controls{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+.mc-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.mc-stat{background:#f5f8f9;border:1px solid var(--line);border-radius:10px;padding:12px 14px;text-align:center}
+.mc-stat .msl{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.mc-stat .msv{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--navy)}
+.mc-stat.highlight{background:var(--navy);border-color:var(--navy)}
+.mc-stat.highlight .msl{color:#9fc0d2}
+.mc-stat.highlight .msv{color:var(--yellow)}
+.mc-stat.pos .msv{color:var(--green)}
+.mc-stat.neg .msv{color:var(--red)}
+.mc-chart-wrap{position:relative;height:120px;margin-bottom:6px}
+canvas#mcCanvas{width:100%;height:120px;display:block;border-radius:8px}
+.mc-axis{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
+.mc-runbtn{background:var(--navy);color:var(--yellow);border:none;border-radius:9px;
+  padding:9px 16px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;margin-top:14px}
+.mc-runbtn:hover{background:var(--navy2)}
+
+@media(max-width:660px){
+  .mc-stat-grid{grid-template-columns:1fr 1fr}
+  .mc-controls{grid-template-columns:1fr}
+}
+
 @media(max-width:660px){
   .cols,.drivers{grid-template-columns:1fr}
   .barrow{grid-template-columns:90px 1fr 100px}
@@ -321,6 +345,40 @@ body:not(.editing) .addsection{display:none}
       </div>
     </div>
 
+    <!-- MONTE CARLO -->
+    <div class="section">
+      <div class="secctrl ctrl">
+        <button class="sbtn" onclick="moveSec(this,-1)" title="Subir">&#8593;</button>
+        <button class="sbtn" onclick="moveSec(this,1)" title="Descer">&#8595;</button>
+        <button class="sbtn x" onclick="delSec(this)" title="Remover seção">&#10005;</button>
+      </div>
+      <div class="eyebrow" contenteditable="true">Simulação</div>
+      <h2 contenteditable="true">Monte Carlo — distribuição de cenários</h2>
+      <div class="mc-box">
+        <div class="mc-controls">
+          <div class="driver">
+            <label>Variância diária (%)</label>
+            <input id="mcVar" value="30" inputmode="numeric">
+          </div>
+          <div class="driver">
+            <label>Simulações</label>
+            <input id="mcN" value="1000" inputmode="numeric">
+          </div>
+        </div>
+        <div class="mc-stat-grid">
+          <div class="mc-stat"><div class="msl">Cenário pessimista (P10)</div><div class="msv" id="mcP10">—</div></div>
+          <div class="mc-stat"><div class="msl">Mediana (P50)</div><div class="msv" id="mcP50">—</div></div>
+          <div class="mc-stat"><div class="msl">Cenário otimista (P90)</div><div class="msv" id="mcP90">—</div></div>
+          <div class="mc-stat highlight"><div class="msl">Prob. cobrir déficit</div><div class="msv" id="mcProb">—</div></div>
+        </div>
+        <div class="mc-chart-wrap">
+          <canvas id="mcCanvas"></canvas>
+        </div>
+        <div class="mc-axis"><span id="mcAxisMin"></span><span id="mcAxisMid"></span><span id="mcAxisMax"></span></div>
+        <button class="mc-runbtn" onclick="runMC()">&#9654; Rodar simulação</button>
+      </div>
+    </div>
+
     <!-- OBSERVAÇÕES -->
     <div class="section">
       <div class="secctrl ctrl">
@@ -371,6 +429,7 @@ function showApp() {
   document.getElementById('main-content').classList.add('visible');
   document.body.classList.add('app');
   recalc();
+  setTimeout(runMC, 50);
 }
 
 document.getElementById('pwd-input').addEventListener('keydown', function(e) {
@@ -481,6 +540,122 @@ function downloadHTML() {
     if (!wasEditing) toggleEdit();
   }, 100);
 }
+
+/* ===== MONTE CARLO ===== */
+function randNormal() {
+  var u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+function runMC() {
+  var dias  = parseBR(document.getElementById('pDias').value)  || 7;
+  var ritmo = parseBR(document.getElementById('pRitmo').value) || 6398;
+  var def   = parseBR(document.getElementById('pDef').value)   || 0;
+  var varPct= parseBR(document.getElementById('mcVar').value)  || 30;
+  var n     = Math.min(Math.max(parseInt(document.getElementById('mcN').value) || 1000, 100), 10000);
+
+  var sigma = varPct / 100;
+  var results = [];
+  for (var i = 0; i < n; i++) {
+    var total = 0;
+    for (var d = 0; d < dias; d++) {
+      total += ritmo * Math.max(0, 1 + sigma * randNormal());
+    }
+    results.push(total - def);
+  }
+  results.sort(function(a, b) { return a - b; });
+
+  var p10 = results[Math.floor(n * 0.10)];
+  var p50 = results[Math.floor(n * 0.50)];
+  var p90 = results[Math.floor(n * 0.90)];
+  var probPos = results.filter(function(r) { return r >= 0; }).length / n * 100;
+
+  function fmt(v) { return (v >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(v), 0); }
+
+  var elP10  = document.getElementById('mcP10');
+  var elP50  = document.getElementById('mcP50');
+  var elP90  = document.getElementById('mcP90');
+  elP10.textContent = fmt(p10);
+  elP50.textContent = fmt(p50);
+  elP90.textContent = fmt(p90);
+  elP10.className = 'msv ' + (p10 >= 0 ? 'pos' : 'neg');
+  elP50.className = 'msv ' + (p50 >= 0 ? 'pos' : 'neg');
+  elP90.className = 'msv ' + (p90 >= 0 ? 'pos' : 'neg');
+  document.getElementById('mcProb').textContent = fmtBR(probPos, 1) + '%';
+
+  /* histograma */
+  var canvas = document.getElementById('mcCanvas');
+  var dpr = window.devicePixelRatio || 1;
+  var W = canvas.parentElement.offsetWidth;
+  var H = 120;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  var ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  var bins = 40;
+  var mn = results[0], mx = results[n - 1];
+  var range = mx - mn || 1;
+  var counts = new Array(bins).fill(0);
+  results.forEach(function(r) {
+    var b = Math.min(bins - 1, Math.floor((r - mn) / range * bins));
+    counts[b]++;
+  });
+  var maxCount = Math.max.apply(null, counts);
+  var bw = W / bins;
+  var zeroBin = Math.floor((0 - mn) / range * bins);
+
+  ctx.clearRect(0, 0, W, H);
+  counts.forEach(function(c, i) {
+    var bh = (c / maxCount) * (H - 10);
+    var x  = i * bw;
+    var isPos = i >= zeroBin;
+    ctx.fillStyle = isPos ? '#1f9d6b' : '#d2433a';
+    ctx.globalAlpha = 0.75;
+    ctx.beginPath();
+    ctx.roundRect(x + 1, H - bh, bw - 2, bh, [3, 3, 0, 0]);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+
+  /* linha do zero */
+  if (mn < 0 && mx > 0) {
+    var zx = ((0 - mn) / range) * W;
+    ctx.strokeStyle = 'rgba(9,39,55,.3)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(zx, 0); ctx.lineTo(zx, H); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  /* linhas P10 / P90 */
+  [[p10, '#c98a00', 'P10'], [p90, '#1f9d6b', 'P90']].forEach(function(item) {
+    var xp = ((item[0] - mn) / range) * W;
+    if (xp < 0 || xp > W) return;
+    ctx.strokeStyle = item[1];
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(xp, 0); ctx.lineTo(xp, H - 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = item[1];
+    ctx.font = 'bold 9px sans-serif';
+    ctx.fillText(item[2], xp + 3, 12);
+  });
+
+  document.getElementById('mcAxisMin').textContent = fmt(mn);
+  document.getElementById('mcAxisMid').textContent = fmt((mn + mx) / 2);
+  document.getElementById('mcAxisMax').textContent = fmt(mx);
+}
+
+/* rodar automaticamente quando os inputs de projeção mudarem */
+['pDias','pRitmo','pDef','mcVar','mcN'].forEach(function(id) {
+  var el = document.getElementById(id);
+  if (el) el.addEventListener('input', function() { runMC(); });
+});
 </script>
 
 </body>
