@@ -175,11 +175,9 @@ body.app{padding:78px 16px 40px}
 .mc-field input:focus{border-color:var(--yellow);box-shadow:0 0 0 2px rgba(255,205,28,.2)}
 .mc-field input:disabled{background:#eee;color:var(--muted)}
 .mc-dist-select{width:100%;border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:inherit;font-size:12px;font-weight:600;color:var(--navy);background:#fff;outline:none;cursor:pointer;margin-bottom:8px}
-.mc-scenario-row{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding:12px 16px;background:#f5f8f9;border:1px solid var(--line);border-radius:10px}
-.mc-scenario-row .msr-label{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
-.mc-preset-btn{padding:7px 18px;border-radius:8px;border:1.5px solid var(--line);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;background:#fff;color:var(--muted);transition:.15s}
-.mc-preset-btn:hover{border-color:var(--navy);color:var(--navy)}
-.mc-preset-btn.active{background:var(--navy);color:var(--yellow);border-color:var(--navy)}
+.mc-savebtn{padding:8px 14px;border-radius:8px;border:1.5px solid var(--line);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;background:#fff;color:var(--muted);transition:.15s;white-space:nowrap}
+.mc-savebtn:hover{border-color:var(--navy);color:var(--navy)}
+.mc-savebtn.saved{border-color:var(--green);color:var(--green)}
 .mc-global{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
 .mc-stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
 .mc-stat{background:#f5f8f9;border:1px solid var(--line);border-radius:10px;padding:11px 14px;text-align:center}
@@ -226,7 +224,6 @@ body.app{padding:78px 16px 40px}
 @media(max-width:660px){
   .mc-dist-row,.mc-vars,.mc-global,.mc-compare-grid{grid-template-columns:1fr}
   .mc-stat-grid{grid-template-columns:1fr 1fr}
-  .mc-scenario-row{flex-wrap:wrap;gap:8px}
   .mc-svg-wrap svg{height:110px}
   input[type=number]{font-size:16px}
 }
@@ -412,13 +409,6 @@ body:not(.editing) .addsection{display:none}
       <h2>Monte Carlo — Recebíveis + Vendas</h2>
       <div class="mc-box">
 
-        <!-- Seletor de cenário (fora dos cards) -->
-        <div class="mc-scenario-row">
-          <span class="msr-label">Cenário de Exames</span>
-          <button class="mc-preset-btn active" id="exPresetBase" onclick="applyExPreset('base')">Base</button>
-          <button class="mc-preset-btn" id="exPresetPess" onclick="applyExPreset('pess')">Pessimista</button>
-        </div>
-
         <!-- Seletores de distribuição (fora dos cards) -->
         <div class="mc-dist-row">
           <div class="mc-dist-col">
@@ -476,8 +466,12 @@ body:not(.editing) .addsection{display:none}
             <div class="mc-field"><label>Nº de simulações</label><input type="number" id="mcN" value="10000"></div>
             <div class="mc-field"><label>Falta a cobrir (R$)</label><input type="number" id="mcFalta" value="63207"></div>
           </div>
-          <div style="display:flex;align-items:flex-end">
+          <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
             <button class="mc-runbtn" onclick="runMC()">&#9654; Rodar simulação</button>
+            <div style="display:flex;gap:6px">
+              <button class="mc-savebtn" id="btnSaveBase" onclick="saveScenario('base')">&#128190; Salvar como Base</button>
+              <button class="mc-savebtn" id="btnSavePess" onclick="saveScenario('pess')">&#128190; Salvar como Pessimista</button>
+            </div>
           </div>
         </div>
 
@@ -509,7 +503,7 @@ body:not(.editing) .addsection{display:none}
 
         <!-- Hint comparação -->
         <div class="mc-compare-hint" id="mcCompareHint">
-          Para comparar cenários: rode a simulação em <strong>Base</strong>, depois troque para <strong>Pessimista</strong> e rode novamente.
+          Configure os valores e rode a simulação. Depois clique <strong>Salvar como Base</strong> ou <strong>Salvar como Pessimista</strong> para comparar os dois cenários.
         </div>
 
         <!-- Comparação base × pessimista -->
@@ -732,24 +726,6 @@ function mcFmtK(v) {
 function mcPct(v) { return v.toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%'; }
 function getN(id) { var v = parseFloat(document.getElementById(id).value); return (isNaN(v) || v < 0) ? 0 : v; }
 
-/* -- preset de Exames -- */
-var mcExPresets = {
-  base: {min: 17000, mode: 19000, max: 21000},
-  pess: {min: 15000, mode: 15000, max: 21000}
-};
-var mcCurrentPreset = 'base';
-
-function applyExPreset(p) {
-  mcCurrentPreset = p;
-  var pr = mcExPresets[p];
-  document.getElementById('exMin').value  = pr.min;
-  document.getElementById('exMode').value = pr.mode;
-  document.getElementById('exMax').value  = pr.max;
-  document.getElementById('exPresetBase').classList.toggle('active', p === 'base');
-  document.getElementById('exPresetPess').classList.toggle('active', p === 'pess');
-  runMC();
-}
-
 /* -- troca de distribuição -- */
 function onDistChange(pfx) {
   var dist = document.getElementById(pfx + 'Dist').value;
@@ -867,6 +843,7 @@ function updateUI(st, falta) {
 
 var mcLastBase = null;
 var mcLastPess = null;
+var mcLastRun  = null;
 
 function runMC() {
   var n     = Math.min(Math.max(parseInt(document.getElementById('mcN').value) || 10000, 100), 50000);
@@ -874,14 +851,27 @@ function runMC() {
 
   var res = simulate(n);
   var st  = calcStats(res, falta);
+  mcLastRun = {res: res, st: st};
   updateUI(st, falta);
   drawHisto('mcSvg', res, falta, st, 1);
+}
 
-  /* salvar para comparação */
-  if (mcCurrentPreset === 'base') mcLastBase = {res: res, st: st};
-  if (mcCurrentPreset === 'pess') mcLastPess = {res: res, st: st};
-
-  /* comparação automática se tiver os dois cenários */
+function saveScenario(type) {
+  if (!mcLastRun) return;
+  var falta = getN('mcFalta');
+  if (type === 'base') {
+    mcLastBase = mcLastRun;
+    var btn = document.getElementById('btnSaveBase');
+    btn.classList.add('saved');
+    btn.textContent = '✓ Base salvo';
+    setTimeout(function() { btn.classList.remove('saved'); btn.textContent = '💾 Salvar como Base'; }, 2000);
+  } else {
+    mcLastPess = mcLastRun;
+    var btn = document.getElementById('btnSavePess');
+    btn.classList.add('saved');
+    btn.textContent = '✓ Pessimista salvo';
+    setTimeout(function() { btn.classList.remove('saved'); btn.textContent = '💾 Salvar como Pessimista'; }, 2000);
+  }
   if (mcLastBase && mcLastPess) {
     document.getElementById('mcCompareHint').style.display = 'none';
     document.getElementById('mcCompare').style.display = '';
