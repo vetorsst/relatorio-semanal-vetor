@@ -163,6 +163,9 @@ body.app{padding:78px 16px 40px}
 
 /* ---------- Monte Carlo ---------- */
 .mc-box{border:1px solid var(--line);border-radius:13px;padding:22px;margin-top:14px;background:#fcfdfd}
+.mc-dist-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:10px}
+.mc-dist-col{display:flex;flex-direction:column;gap:4px}
+.mc-dist-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
 .mc-vars{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
 .mc-var-card{background:#f5f8f9;border:1px solid var(--line);border-radius:10px;padding:14px 16px}
 .mc-var-card h4{font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px}
@@ -203,7 +206,7 @@ body.app{padding:78px 16px 40px}
 .mc-runbtn{background:var(--navy);color:var(--yellow);border:none;border-radius:9px;padding:10px 20px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:.15s}
 .mc-runbtn:hover{background:var(--navy2)}
 @media(max-width:660px){
-  .mc-vars,.mc-global,.mc-compare-grid{grid-template-columns:1fr}
+  .mc-dist-row,.mc-vars,.mc-global,.mc-compare-grid{grid-template-columns:1fr}
   .mc-stat-grid{grid-template-columns:1fr 1fr}
 }
 
@@ -385,15 +388,36 @@ body:not(.editing) .addsection{display:none}
           <button class="mc-preset-btn" id="exPresetPess" onclick="applyExPreset('pess')">Pessimista</button>
         </div>
 
+        <!-- Seletores de distribuição (fora dos cards) -->
+        <div class="mc-dist-row">
+          <div class="mc-dist-col">
+            <span class="mc-dist-label">Distribuição — Exames</span>
+            <select class="mc-dist-select" id="exDist" onchange="onDistChange('ex')">
+              <option value="tri">Triangular</option>
+              <option value="uni">Uniforme</option>
+            </select>
+          </div>
+          <div class="mc-dist-col">
+            <span class="mc-dist-label">Distribuição — Recor'D</span>
+            <select class="mc-dist-select" id="rdDist" onchange="onDistChange('rd')">
+              <option value="uni">Uniforme</option>
+              <option value="tri">Triangular</option>
+            </select>
+          </div>
+          <div class="mc-dist-col">
+            <span class="mc-dist-label">Distribuição — Vendas Novas</span>
+            <select class="mc-dist-select" id="vnDist" onchange="onDistChange('vn')">
+              <option value="tri">Triangular</option>
+              <option value="uni">Uniforme</option>
+            </select>
+          </div>
+        </div>
+
         <!-- Variáveis -->
         <div class="mc-vars">
           <!-- Exames -->
           <div class="mc-var-card">
             <h4>Exames</h4>
-            <select class="mc-dist-select" id="exDist" onchange="onDistChange('ex')">
-              <option value="tri">Triangular</option>
-              <option value="uni">Uniforme</option>
-            </select>
             <div class="mc-field"><label>Mínimo</label><input type="number" id="exMin" value="17000"></div>
             <div class="mc-field" id="exModeWrap"><label>Moda</label><input type="number" id="exMode" value="19000"></div>
             <div class="mc-field"><label>Máximo</label><input type="number" id="exMax" value="21000"></div>
@@ -401,10 +425,6 @@ body:not(.editing) .addsection{display:none}
           <!-- Recor'D -->
           <div class="mc-var-card">
             <h4>Recor'D</h4>
-            <select class="mc-dist-select" id="rdDist" onchange="onDistChange('rd')">
-              <option value="uni">Uniforme</option>
-              <option value="tri">Triangular</option>
-            </select>
             <div class="mc-field"><label>Mínimo</label><input type="number" id="rdMin" value="39000"></div>
             <div class="mc-field" id="rdModeWrap" style="display:none"><label>Moda</label><input type="number" id="rdMode" value="43000"></div>
             <div class="mc-field"><label>Máximo</label><input type="number" id="rdMax" value="47000"></div>
@@ -412,10 +432,6 @@ body:not(.editing) .addsection{display:none}
           <!-- Vendas Novas -->
           <div class="mc-var-card">
             <h4>Vendas Novas</h4>
-            <select class="mc-dist-select" id="vnDist" onchange="onDistChange('vn')">
-              <option value="tri">Triangular</option>
-              <option value="uni">Uniforme</option>
-            </select>
             <div class="mc-field"><label>Mínimo</label><input type="number" id="vnMin" value="20000"></div>
             <div class="mc-field" id="vnModeWrap"><label>Moda</label><input type="number" id="vnMode" value="21000"></div>
             <div class="mc-field"><label>Máximo</label><input type="number" id="vnMax" value="24000"></div>
