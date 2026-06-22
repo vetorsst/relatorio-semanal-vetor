@@ -161,6 +161,50 @@ body.app{padding:78px 16px 40px}
 .obs p{font-size:13.5px;color:var(--ink);line-height:1.7}
 .foot{text-align:center;font-size:11px;color:var(--muted);padding:18px}
 
+/* ---------- Monte Carlo ---------- */
+.mc-box{border:1px solid var(--line);border-radius:13px;padding:22px;margin-top:14px;background:#fcfdfd}
+.mc-vars{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+.mc-var-card{background:#f5f8f9;border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.mc-var-card h4{font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px}
+.mc-field{margin-bottom:8px}
+.mc-field label{display:block;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px}
+.mc-field input{width:100%;border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:inherit;font-size:13px;font-weight:600;color:var(--navy);outline:none;background:#fff;transition:.15s}
+.mc-field input:focus{border-color:var(--yellow);box-shadow:0 0 0 2px rgba(255,205,28,.2)}
+.mc-field input:disabled{background:#eee;color:var(--muted)}
+.mc-dist-select{width:100%;border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:inherit;font-size:12px;font-weight:600;color:var(--navy);background:#fff;outline:none;cursor:pointer;margin-bottom:8px}
+.mc-preset-row{display:flex;gap:6px;margin-bottom:10px}
+.mc-preset-btn{flex:1;padding:5px 8px;border-radius:7px;border:1px solid var(--line);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;background:#fff;color:var(--muted);transition:.15s}
+.mc-preset-btn.active{background:var(--navy);color:var(--yellow);border-color:var(--navy)}
+.mc-global{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+.mc-stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.mc-stat{background:#f5f8f9;border:1px solid var(--line);border-radius:10px;padding:11px 14px;text-align:center}
+.mc-stat .msl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.mc-stat .msv{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--navy)}
+.mc-stat.pos .msv{color:var(--green)}
+.mc-stat.neg .msv{color:var(--red)}
+.mc-prob-row{display:flex;align-items:center;justify-content:space-between;background:var(--navy);border-radius:12px;padding:14px 20px;margin-bottom:16px;gap:16px;flex-wrap:wrap}
+.mc-prob-row .mpl{color:#9fc0d2;font-size:12.5px;font-weight:600}
+.mc-prob-row .mpv{color:var(--yellow);font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
+.mc-svg-wrap{width:100%;overflow:hidden;border-radius:8px;margin-bottom:4px}
+.mc-svg-wrap svg{display:block;width:100%;height:160px}
+.mc-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-bottom:14px}
+.mc-legend span{display:flex;align-items:center;gap:5px}
+.mc-legend .dot{width:12px;height:3px;border-radius:2px;flex:none}
+.mc-compare{border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:14px;background:#f7f9fa}
+.mc-compare h4{font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px}
+.mc-compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mc-compare-col{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px}
+.mc-compare-col h5{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
+.mc-compare-stat{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;font-size:12.5px}
+.mc-compare-stat .ck{color:var(--muted);font-weight:500}
+.mc-compare-stat .cv{font-weight:700;font-variant-numeric:tabular-nums}
+.mc-runbtn{background:var(--navy);color:var(--yellow);border:none;border-radius:9px;padding:10px 20px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:.15s}
+.mc-runbtn:hover{background:var(--navy2)}
+@media(max-width:660px){
+  .mc-vars,.mc-global,.mc-compare-grid{grid-template-columns:1fr}
+  .mc-stat-grid{grid-template-columns:1fr 1fr}
+}
+
 /* ---------- Edit chrome ---------- */
 [contenteditable="true"]{outline:none;border-radius:4px;transition:box-shadow .15s}
 body.editing [contenteditable="true"]:hover{box-shadow:0 0 0 2px rgba(255,205,28,.45)}
@@ -321,6 +365,117 @@ body:not(.editing) .addsection{display:none}
       </div>
     </div>
 
+    <!-- MONTE CARLO -->
+    <div class="section">
+      <div class="secctrl ctrl">
+        <button class="sbtn" onclick="moveSec(this,-1)" title="Subir">&#8593;</button>
+        <button class="sbtn" onclick="moveSec(this,1)" title="Descer">&#8595;</button>
+        <button class="sbtn x" onclick="delSec(this)" title="Remover seção">&#10005;</button>
+      </div>
+      <div class="eyebrow">Simulação</div>
+      <h2>Monte Carlo — Recebíveis + Vendas</h2>
+      <div class="mc-box">
+
+        <!-- Variáveis -->
+        <div class="mc-vars">
+          <!-- Exames -->
+          <div class="mc-var-card">
+            <h4>Exames</h4>
+            <div class="mc-preset-row">
+              <button class="mc-preset-btn active" id="exPresetBase" onclick="applyExPreset('base')">Base</button>
+              <button class="mc-preset-btn" id="exPresetPess" onclick="applyExPreset('pess')">Pessimista</button>
+            </div>
+            <select class="mc-dist-select" id="exDist" onchange="onDistChange('ex')">
+              <option value="tri">Triangular</option>
+              <option value="uni">Uniforme</option>
+            </select>
+            <div class="mc-field"><label>Mínimo</label><input type="number" id="exMin" value="17000"></div>
+            <div class="mc-field" id="exModeWrap"><label>Moda</label><input type="number" id="exMode" value="19000"></div>
+            <div class="mc-field"><label>Máximo</label><input type="number" id="exMax" value="21000"></div>
+          </div>
+          <!-- Recor'D -->
+          <div class="mc-var-card">
+            <h4>Recor'D</h4>
+            <select class="mc-dist-select" id="rdDist" onchange="onDistChange('rd')">
+              <option value="uni">Uniforme</option>
+              <option value="tri">Triangular</option>
+            </select>
+            <div class="mc-field"><label>Mínimo</label><input type="number" id="rdMin" value="39000"></div>
+            <div class="mc-field" id="rdModeWrap" style="display:none"><label>Moda</label><input type="number" id="rdMode" value="43000"></div>
+            <div class="mc-field"><label>Máximo</label><input type="number" id="rdMax" value="47000"></div>
+          </div>
+          <!-- Vendas Novas -->
+          <div class="mc-var-card">
+            <h4>Vendas Novas</h4>
+            <select class="mc-dist-select" id="vnDist" onchange="onDistChange('vn')">
+              <option value="tri">Triangular</option>
+              <option value="uni">Uniforme</option>
+            </select>
+            <div class="mc-field"><label>Mínimo</label><input type="number" id="vnMin" value="20000"></div>
+            <div class="mc-field" id="vnModeWrap"><label>Moda</label><input type="number" id="vnMode" value="21000"></div>
+            <div class="mc-field"><label>Máximo</label><input type="number" id="vnMax" value="24000"></div>
+          </div>
+        </div>
+
+        <!-- Globais -->
+        <div class="mc-global">
+          <div class="mc-var-card">
+            <h4>Configuração</h4>
+            <div class="mc-field"><label>Nº de simulações</label><input type="number" id="mcN" value="10000"></div>
+            <div class="mc-field"><label>Falta a cobrir (R$)</label><input type="number" id="mcFalta" value="63207"></div>
+          </div>
+          <div style="display:flex;align-items:flex-end">
+            <button class="mc-runbtn" onclick="runMC()">&#9654; Rodar simulação</button>
+          </div>
+        </div>
+
+        <!-- Probabilidade destaque -->
+        <div class="mc-prob-row">
+          <span class="mpl">Probabilidade de cobrir a Falta (R$ <span id="mcFaltaLbl">63.207</span>)</span>
+          <span class="mpv" id="mcProb">—</span>
+        </div>
+
+        <!-- Estatísticas -->
+        <div class="mc-stat-grid">
+          <div class="mc-stat"><div class="msl">Média</div><div class="msv" id="mcMean">—</div></div>
+          <div class="mc-stat"><div class="msl">P10 — Pessimista</div><div class="msv neg" id="mcP10">—</div></div>
+          <div class="mc-stat"><div class="msl">P50 — Mediana</div><div class="msv" id="mcP50">—</div></div>
+          <div class="mc-stat"><div class="msl">P90 — Otimista</div><div class="msv pos" id="mcP90">—</div></div>
+          <div class="mc-stat"><div class="msl">Mínimo</div><div class="msv" id="mcMin">—</div></div>
+          <div class="mc-stat"><div class="msl">Máximo</div><div class="msv" id="mcMax">—</div></div>
+        </div>
+
+        <!-- Histograma -->
+        <div class="mc-svg-wrap"><svg id="mcSvg" viewBox="0 0 600 160" preserveAspectRatio="none"></svg></div>
+        <div class="mc-legend">
+          <span><span class="dot" style="background:var(--yellow);height:10px;border-radius:3px"></span>Dentro P10–P90</span>
+          <span><span class="dot" style="background:#f1e3ad;height:10px;border-radius:3px"></span>Cauda</span>
+          <span><span class="dot" style="background:var(--red)"></span>Falta</span>
+          <span><span class="dot" style="background:var(--navy);opacity:.5"></span>P10 / P90</span>
+          <span><span class="dot" style="background:var(--navy)"></span>P50</span>
+        </div>
+
+        <!-- Comparação base × pessimista -->
+        <div class="mc-compare" id="mcCompare" style="display:none">
+          <h4>Comparação: Cenário Base × Pessimista (Exames)</h4>
+          <div class="mc-svg-wrap" style="margin-bottom:10px"><svg id="mcSvgCmp" viewBox="0 0 600 120" preserveAspectRatio="none"></svg></div>
+          <div class="mc-compare-grid">
+            <div class="mc-compare-col">
+              <h5>Cenário Base</h5>
+              <div class="mc-compare-stat"><span class="ck">P50</span><span class="cv" id="cmpBaseP50">—</span></div>
+              <div class="mc-compare-stat"><span class="ck">P(cobrir)</span><span class="cv" id="cmpBaseProb">—</span></div>
+            </div>
+            <div class="mc-compare-col">
+              <h5>Cenário Pessimista</h5>
+              <div class="mc-compare-stat"><span class="ck">P50</span><span class="cv" id="cmpPessP50">—</span></div>
+              <div class="mc-compare-stat"><span class="ck">P(cobrir)</span><span class="cv" id="cmpPessProb">—</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
     <!-- OBSERVAÇÕES -->
     <div class="section">
       <div class="secctrl ctrl">
@@ -371,6 +526,7 @@ function showApp() {
   document.getElementById('main-content').classList.add('visible');
   document.body.classList.add('app');
   recalc();
+  setTimeout(runMC, 80);
 }
 
 document.getElementById('pwd-input').addEventListener('keydown', function(e) {
@@ -481,6 +637,250 @@ function downloadHTML() {
     if (!wasEditing) toggleEdit();
   }, 100);
 }
+
+/* ===== MONTE CARLO ===== */
+
+/* -- samplers -- */
+function sampleTri(a, c, b) {
+  c = Math.min(Math.max(c, a), b);
+  var U = Math.random(), F = (b === a) ? 0.5 : (c - a) / (b - a);
+  return U < F
+    ? a + Math.sqrt(U * (b - a) * (c - a))
+    : b - Math.sqrt((1 - U) * (b - a) * (b - c));
+}
+function sampleUni(a, b) { return a + Math.random() * (b - a); }
+
+function sample(dist, mn, mo, mx) {
+  return dist === 'uni' ? sampleUni(mn, mx) : sampleTri(mn, mo, mx);
+}
+
+/* -- helpers -- */
+function mcFmt(v) {
+  return 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+}
+function mcFmtK(v) {
+  return (v / 1000).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0}) + 'k';
+}
+function mcPct(v) { return v.toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%'; }
+function getN(id) { return parseFloat(document.getElementById(id).value) || 0; }
+
+/* -- preset de Exames -- */
+var mcExPresets = {
+  base: {min: 17000, mode: 19000, max: 21000},
+  pess: {min: 15000, mode: 15000, max: 21000}
+};
+var mcCurrentPreset = 'base';
+
+function applyExPreset(p) {
+  mcCurrentPreset = p;
+  var pr = mcExPresets[p];
+  document.getElementById('exMin').value  = pr.min;
+  document.getElementById('exMode').value = pr.mode;
+  document.getElementById('exMax').value  = pr.max;
+  document.getElementById('exPresetBase').classList.toggle('active', p === 'base');
+  document.getElementById('exPresetPess').classList.toggle('active', p === 'pess');
+  runMC();
+}
+
+/* -- troca de distribuição -- */
+function onDistChange(pfx) {
+  var dist = document.getElementById(pfx + 'Dist').value;
+  var wrap = document.getElementById(pfx + 'ModeWrap');
+  if (wrap) {
+    wrap.style.display = dist === 'uni' ? 'none' : '';
+    var inp = document.getElementById(pfx + 'Mode');
+    if (inp) inp.disabled = dist === 'uni';
+  }
+  runMC();
+}
+
+/* -- simulação -- */
+function simulate(n) {
+  var exDist = document.getElementById('exDist').value;
+  var rdDist = document.getElementById('rdDist').value;
+  var vnDist = document.getElementById('vnDist').value;
+  var res = new Array(n);
+  for (var i = 0; i < n; i++) {
+    var ex = sample(exDist, getN('exMin'), getN('exMode'), getN('exMax'));
+    var rd = sample(rdDist, getN('rdMin'), getN('rdMode'), getN('rdMax'));
+    var vn = sample(vnDist, getN('vnMin'), getN('vnMode'), getN('vnMax'));
+    res[i] = ex + rd + vn;
+  }
+  res.sort(function(a, b) { return a - b; });
+  return res;
+}
+
+function calcStats(res, falta) {
+  var n = res.length;
+  var mean = res.reduce(function(s, v) { return s + v; }, 0) / n;
+  var p10 = res[Math.floor(n * 0.10)];
+  var p50 = res[Math.floor(n * 0.50)];
+  var p90 = res[Math.floor(n * 0.90)];
+  var prob = res.filter(function(v) { return v >= falta; }).length / n * 100;
+  return {mean: mean, p10: p10, p50: p50, p90: p90, min: res[0], max: res[n-1], prob: prob};
+}
+
+/* -- histograma SVG -- */
+function drawHisto(svgId, results, falta, st, alpha, bins) {
+  bins = bins || 36;
+  var svg = document.getElementById(svgId);
+  var W = 600, H = parseInt(svg.getAttribute('viewBox').split(' ')[3]);
+  var mn = results[0], mx = results[results.length - 1];
+  var range = mx - mn || 1;
+  var counts = new Array(bins).fill(0);
+  results.forEach(function(v) {
+    var b = Math.min(bins - 1, Math.floor((v - mn) / range * bins));
+    counts[b]++;
+  });
+  var maxC = Math.max.apply(null, counts);
+  var bw = W / bins;
+  var gradId = svgId + 'Grad';
+
+  var paths = '';
+  counts.forEach(function(c, i) {
+    var bh = (c / maxC) * (H - 22);
+    var x = i * bw;
+    var binLo = mn + (i / bins) * range;
+    var binHi = mn + ((i + 1) / bins) * range;
+    var inCenter = (binLo >= st.p10 && binHi <= st.p90);
+    var fill = inCenter
+      ? 'url(#' + gradId + ')'
+      : 'rgba(241,227,173,' + (alpha || 1) + ')';
+    paths += '<rect x="' + (x + 0.5).toFixed(1) + '" y="' + (H - 22 - bh).toFixed(1) +
+      '" width="' + (bw - 1).toFixed(1) + '" height="' + bh.toFixed(1) +
+      '" rx="2" fill="' + fill + '"/>';
+  });
+
+  /* linhas de referência */
+  function xOf(v) { return ((v - mn) / range * W).toFixed(1); }
+  var lines = '';
+  if (falta >= mn && falta <= mx) {
+    var xf = xOf(falta);
+    lines += '<line x1="' + xf + '" y1="0" x2="' + xf + '" y2="' + (H - 22) +
+      '" stroke="#d2433a" stroke-width="2"/>' +
+      '<text x="' + (parseFloat(xf) + 3) + '" y="12" font-size="9" fill="#d2433a" font-weight="700">Falta</text>';
+  }
+  [[st.p10, '0 6 6 0', 0.5], [st.p90, '0 6 6 0', 0.5]].forEach(function(item) {
+    var xp = xOf(item[0]);
+    lines += '<line x1="' + xp + '" y1="0" x2="' + xp + '" y2="' + (H - 22) +
+      '" stroke="#092737" stroke-width="1.5" stroke-dasharray="4 3" opacity="' + item[2] + '"/>';
+  });
+  var xp50 = xOf(st.p50);
+  lines += '<line x1="' + xp50 + '" y1="0" x2="' + xp50 + '" y2="' + (H - 22) +
+    '" stroke="#092737" stroke-width="2"/>' +
+    '<text x="' + (parseFloat(xp50) + 3) + '" y="12" font-size="9" fill="#092737" font-weight="700">P50</text>';
+
+  /* eixo X */
+  var axis = '';
+  var ticks = [mn, mn + range * 0.25, mn + range * 0.5, mn + range * 0.75, mx];
+  ticks.forEach(function(v) {
+    var xv = xOf(v);
+    axis += '<text x="' + xv + '" y="' + (H - 4) + '" font-size="9" fill="#6b7c85" text-anchor="middle">' + mcFmtK(v) + '</text>';
+  });
+
+  svg.innerHTML =
+    '<defs><linearGradient id="' + gradId + '" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0%" stop-color="#FFCD1C"/><stop offset="100%" stop-color="#f5c000"/>' +
+    '</linearGradient></defs>' +
+    paths + lines + axis;
+}
+
+/* -- atualizar UI -- */
+function updateUI(st, falta) {
+  document.getElementById('mcFaltaLbl').textContent = mcFmtK(falta).replace('k', '.000').replace(',', '.');
+  document.getElementById('mcFaltaLbl').textContent = falta.toLocaleString('pt-BR');
+  document.getElementById('mcProb').textContent  = mcPct(st.prob);
+  document.getElementById('mcMean').textContent  = mcFmt(st.mean);
+  document.getElementById('mcP10').textContent   = mcFmt(st.p10);
+  document.getElementById('mcP50').textContent   = mcFmt(st.p50);
+  document.getElementById('mcP90').textContent   = mcFmt(st.p90);
+  document.getElementById('mcMin').textContent   = mcFmt(st.min);
+  document.getElementById('mcMax').textContent   = mcFmt(st.max);
+}
+
+var mcLastBase = null;
+var mcLastPess = null;
+
+function runMC() {
+  var n     = Math.min(Math.max(parseInt(document.getElementById('mcN').value) || 10000, 100), 50000);
+  var falta = getN('mcFalta');
+
+  var res = simulate(n);
+  var st  = calcStats(res, falta);
+  updateUI(st, falta);
+  drawHisto('mcSvg', res, falta, st, 1);
+
+  /* salvar para comparação */
+  if (mcCurrentPreset === 'base') mcLastBase = {res: res, st: st};
+  if (mcCurrentPreset === 'pess') mcLastPess = {res: res, st: st};
+
+  /* comparação automática se tiver os dois cenários */
+  if (mcLastBase && mcLastPess) {
+    document.getElementById('mcCompare').style.display = '';
+    document.getElementById('cmpBaseP50').textContent  = mcFmt(mcLastBase.st.p50);
+    document.getElementById('cmpBaseProb').textContent = mcPct(mcLastBase.st.prob);
+    document.getElementById('cmpPessP50').textContent  = mcFmt(mcLastPess.st.p50);
+    document.getElementById('cmpPessProb').textContent = mcPct(mcLastPess.st.prob);
+    drawCompareSvg(falta);
+  }
+}
+
+function drawCompareSvg(falta) {
+  if (!mcLastBase || !mcLastPess) return;
+  var allRes = mcLastBase.res.concat(mcLastPess.res);
+  allRes.sort(function(a, b) { return a - b; });
+  var mn = allRes[0], mx = allRes[allRes.length - 1], range = mx - mn || 1;
+  var bins = 36, W = 600, H = 120;
+  var bw = W / bins;
+
+  function hist(res) {
+    var c = new Array(bins).fill(0);
+    res.forEach(function(v) {
+      var b = Math.min(bins - 1, Math.floor((v - mn) / range * bins));
+      c[b]++;
+    });
+    return c;
+  }
+  var cB = hist(mcLastBase.res);
+  var cP = hist(mcLastPess.res);
+  var maxC = Math.max.apply(null, cB.concat(cP));
+
+  var paths = '';
+  cB.forEach(function(c, i) {
+    var bh = (c / maxC) * (H - 22);
+    paths += '<rect x="' + (i * bw + 0.5).toFixed(1) + '" y="' + (H - 22 - bh).toFixed(1) +
+      '" width="' + (bw * 0.45).toFixed(1) + '" height="' + bh.toFixed(1) +
+      '" rx="1" fill="#FFCD1C" opacity="0.85"/>';
+  });
+  cP.forEach(function(c, i) {
+    var bh = (c / maxC) * (H - 22);
+    paths += '<rect x="' + (i * bw + bw * 0.5).toFixed(1) + '" y="' + (H - 22 - bh).toFixed(1) +
+      '" width="' + (bw * 0.45).toFixed(1) + '" height="' + bh.toFixed(1) +
+      '" rx="1" fill="#d2433a" opacity="0.6"/>';
+  });
+
+  var xf = ((falta - mn) / range * W).toFixed(1);
+  var line = falta >= mn && falta <= mx
+    ? '<line x1="' + xf + '" y1="0" x2="' + xf + '" y2="' + (H - 22) + '" stroke="#d2433a" stroke-width="2"/>'
+    : '';
+
+  var legend =
+    '<rect x="4" y="4" width="10" height="10" rx="2" fill="#FFCD1C"/>' +
+    '<text x="18" y="13" font-size="9" fill="#092737" font-weight="600">Base</text>' +
+    '<rect x="52" y="4" width="10" height="10" rx="2" fill="#d2433a" opacity="0.6"/>' +
+    '<text x="66" y="13" font-size="9" fill="#092737" font-weight="600">Pessimista</text>';
+
+  document.getElementById('mcSvgCmp').innerHTML = paths + line + legend;
+}
+
+/* auto-rodar ao mudar inputs */
+(function() {
+  var ids = ['exMin','exMode','exMax','rdMin','rdMode','rdMax','vnMin','vnMode','vnMax','mcN','mcFalta'];
+  ids.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('change', runMC);
+  });
+})();
 </script>
 
 </body>
