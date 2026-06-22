@@ -226,6 +226,9 @@ body.app{padding:78px 16px 40px}
 @media(max-width:660px){
   .mc-dist-row,.mc-vars,.mc-global,.mc-compare-grid{grid-template-columns:1fr}
   .mc-stat-grid{grid-template-columns:1fr 1fr}
+  .mc-scenario-row{flex-wrap:wrap;gap:8px}
+  .mc-svg-wrap svg{height:110px}
+  input[type=number]{font-size:16px}
 }
 
 /* ---------- Banner de modo edição ---------- */
@@ -680,6 +683,9 @@ function toggleEdit() {
 /* ===== BAIXAR HTML ===== */
 function downloadHTML() {
   document.querySelectorAll('input').forEach(function(i) { i.setAttribute('value', i.value); });
+  document.querySelectorAll('select').forEach(function(s) {
+    Array.from(s.options).forEach(function(o, idx) { o.selected = (idx === s.selectedIndex); });
+  });
   var wasEditing = document.body.classList.contains('editing');
   if (!wasEditing) {
     document.body.classList.add('editing');
