@@ -583,6 +583,8 @@ function showApp() {
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('main-content').classList.add('visible');
   document.body.classList.add('app');
+  restoreData();
+  bindEvents();
   recalc();
   setTimeout(runMC, 80);
 }
@@ -624,10 +626,6 @@ function recalc() {
   el.textContent = (res >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(res));
   el.className = 'rv ' + (res >= 0 ? 'pos' : 'neg');
 }
-['pDias','pRitmo','pDef'].forEach(function(id) {
-  document.getElementById(id).addEventListener('input', recalc);
-});
-
 /* ===== LINHAS ===== */
 function addLine(btn) {
   var list = btn.parentElement.querySelector('.linelist');
@@ -638,8 +636,9 @@ function addLine(btn) {
     '<div class="val" contenteditable="true">R$ 0,00</div>';
   list.appendChild(row);
   row.querySelector('.lbl span').focus();
+  scheduleSave();
 }
-function delLine(btn) { btn.closest('.line').remove(); }
+function delLine(btn) { btn.closest('.line').remove(); scheduleSave(); }
 
 /* ===== SEÇÕES ===== */
 function moveSec(btn, dir) {
@@ -649,7 +648,7 @@ function moveSec(btn, dir) {
   if (dir > 0 && sec.nextElementSibling && sec.nextElementSibling.classList.contains('section'))
     sec.parentNode.insertBefore(sec.nextElementSibling, sec);
 }
-function delSec(btn) { if (confirm('Remover esta seção?')) btn.closest('.section').remove(); }
+function delSec(btn) { if (confirm('Remover esta seção?')) { btn.closest('.section').remove(); scheduleSave(); } }
 function addSec() {
   var addBtn = document.querySelector('.addsection');
   var sec = document.createElement('div'); sec.className = 'section';
@@ -931,14 +930,71 @@ function drawCompareSvg(falta) {
   document.getElementById('mcSvgCmp').innerHTML = paths + line + legend;
 }
 
-/* auto-rodar ao mudar inputs */
-(function() {
-  var ids = ['exMin','exMode','exMax','rdMin','rdMode','rdMax','vnMin','vnMode','vnMax','mcN','mcFalta'];
-  ids.forEach(function(id) {
+/* ===== EVENTOS E PERSISTÊNCIA ===== */
+
+function bindEvents() {
+  ['pDias','pRitmo','pDef'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', recalc);
+  });
+  var mcIds = ['exMin','exMode','exMax','rdMin','rdMode','rdMax','vnMin','vnMode','vnMax','mcN','mcFalta'];
+  mcIds.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.addEventListener('change', runMC);
   });
-})();
+  var sec = document.getElementById('sections');
+  if (sec) {
+    sec.addEventListener('input', scheduleSave);
+    sec.addEventListener('change', scheduleSave);
+    sec.addEventListener('focusout', scheduleSave);
+  }
+  var head = document.querySelector('.head');
+  if (head) head.addEventListener('focusout', scheduleSave);
+  var foot = document.querySelector('.foot');
+  if (foot) foot.addEventListener('focusout', scheduleSave);
+}
+
+var saveTimer;
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(persistData, 700);
+}
+
+function persistData() {
+  try {
+    document.querySelectorAll('#sections input').forEach(function(i) { i.setAttribute('value', i.value); });
+    document.querySelectorAll('#sections select').forEach(function(s) {
+      Array.from(s.options).forEach(function(o, idx) { o.selected = (idx === s.selectedIndex); });
+    });
+    var h1el = document.querySelector('.head h1');
+    var pel  = document.querySelector('.head .period');
+    var fel  = document.querySelector('.foot');
+    localStorage.setItem('vs_report_v1', JSON.stringify({
+      v: 1,
+      sections: document.getElementById('sections').innerHTML,
+      h1:     h1el ? h1el.innerHTML  : '',
+      period: pel  ? pel.innerHTML   : '',
+      foot:   fel  ? fel.innerHTML   : ''
+    }));
+  } catch(e) {}
+}
+
+function restoreData() {
+  try {
+    var raw = localStorage.getItem('vs_report_v1');
+    if (!raw) return;
+    var d = JSON.parse(raw);
+    if (d.v !== 1) return;
+    var sec = document.getElementById('sections');
+    if (d.sections && sec) sec.innerHTML = d.sections;
+    var h1el = document.querySelector('.head h1');
+    if (d.h1 && h1el) h1el.innerHTML = d.h1;
+    var pel = document.querySelector('.head .period');
+    if (d.period && pel) pel.innerHTML = d.period;
+    var fel = document.querySelector('.foot');
+    if (d.foot && fel) fel.innerHTML = d.foot;
+  } catch(e) {}
+}
 </script>
 
 </body>
