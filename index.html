@@ -71,6 +71,7 @@ body.app{padding:78px 16px 40px}
 .tbtn.primary{background:var(--yellow);color:var(--navy);border-color:var(--yellow)}
 .tbtn.primary:hover{filter:brightness(.95)}
 .hint{font-size:11px;color:#9fc0d2;font-weight:400;margin-left:4px}
+.save-toast{font-size:11px;color:#6fcf97;font-weight:600;opacity:0;transition:opacity .3s;white-space:nowrap}
 
 /* ---------- Page ---------- */
 .page{max-width:860px;margin:0 auto;background:var(--card);border-radius:16px;overflow:hidden;
@@ -301,6 +302,7 @@ body:not(.editing) .addsection{display:none}
   <button class="tbtn" onclick="toggleEdit()" id="editToggle">&#9998; Editar</button>
   <button class="tbtn" onclick="window.print()">&#128424; Imprimir / PDF</button>
   <button class="tbtn primary" onclick="downloadHTML()">&#8595; Baixar HTML</button>
+  <span class="save-toast" id="saveToast">&#10003; Salvo</span>
 </div>
 
 <div class="page" id="page">
@@ -952,6 +954,7 @@ function bindEvents() {
   if (head) head.addEventListener('focusout', scheduleSave);
   var foot = document.querySelector('.foot');
   if (foot) foot.addEventListener('focusout', scheduleSave);
+  window.addEventListener('beforeunload', persistData);
 }
 
 var saveTimer;
@@ -976,6 +979,12 @@ function persistData() {
       period: pel  ? pel.innerHTML   : '',
       foot:   fel  ? fel.innerHTML   : ''
     }));
+    var toast = document.getElementById('saveToast');
+    if (toast) {
+      toast.style.opacity = '1';
+      clearTimeout(toast._t);
+      toast._t = setTimeout(function() { toast.style.opacity = '0'; }, 1800);
+    }
   } catch(e) {}
 }
 
