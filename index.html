@@ -128,6 +128,10 @@ body.app{padding:78px 16px 40px}
 .deficit .dl small{display:block;font-size:11.5px;font-weight:400;color:#b56b66;margin-top:2px}
 .deficit .dv{font-size:26px;font-weight:800;color:var(--red);
   font-variant-numeric:tabular-nums;white-space:nowrap}
+.deficit.super{background:var(--greenbg);border-color:#bfe6d3}
+.deficit.super .dl{color:#1c7a54}
+.deficit.super .dl small{color:#4ea784}
+.deficit.super .dv{color:var(--green)}
 
 /* ---------- Projeção ---------- */
 .proj{border:1px solid var(--line);border-radius:13px;padding:22px;margin-top:14px;background:#fcfdfd}
@@ -321,7 +325,7 @@ body:not(.editing) .addsection{display:none}
     <div class="hero" data-keep="">
       <div>
         <div class="hl" contenteditable="true">Projeção de fechamento da semana</div>
-        <div class="hv" contenteditable="true">≈ +R$ 20.000</div>
+        <div class="hv calc" contenteditable="false">≈ +R$ 20.000</div>
         <div class="hs" contenteditable="true">Estimativa mantido o ritmo diário atual de receita até o fim da semana.</div>
       </div>
       <div class="badge"><small contenteditable="true">Tendência</small><span contenteditable="true">Positiva</span></div>
@@ -342,9 +346,9 @@ body:not(.editing) .addsection{display:none}
           <div class="ch"><span contenteditable="true">Receita</span></div>
           <div class="linelist">
             <div class="line"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Caixa gerado</span><span class="sub" contenteditable="true">entrou de fato na semana</span></div><div class="val" contenteditable="true">R$ 89.566,43</div></div>
-            <div class="line"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">A receber</span><span class="sub" contenteditable="true">títulos em aberto a vencer</span></div><div class="val" contenteditable="true">R$ 36.882,76</div></div>
-            <div class="line"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Atrasados</span><span class="sub" contenteditable="true">inadimplência da semana</span></div><div class="val" contenteditable="true">R$ 4.640,00</div></div>
-            <div class="line"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Saldo em conta</span><span class="sub" contenteditable="true">posição atual</span></div><div class="val" contenteditable="true">R$ 25.043,84</div></div>
+            <div class="line" data-role="receber"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">A receber</span><span class="sub" contenteditable="true">títulos em aberto a vencer · considera −10% inadimplência</span></div><div class="val" contenteditable="true">R$ 36.882,76</div></div>
+            <div class="line" data-role="atrasados"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Atrasados</span><span class="sub" contenteditable="true">inadimplência da semana</span></div><div class="val" contenteditable="true">R$ 4.640,00</div></div>
+            <div class="line" data-role="saldo"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Saldo em conta</span><span class="sub" contenteditable="true">posição atual</span></div><div class="val" contenteditable="true">R$ 25.043,84</div></div>
           </div>
           <button class="addline ctrl" onclick="addLine(this)">+ adicionar linha</button>
         </div>
@@ -353,7 +357,7 @@ body:not(.editing) .addsection{display:none}
           <div class="ch"><span contenteditable="true">Despesa</span></div>
           <div class="linelist">
             <div class="line"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Paga</span><span class="sub" contenteditable="true">liquidada na semana</span></div><div class="val" contenteditable="true">R$ 76.120,71</div></div>
-            <div class="line"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">A pagar</span><span class="sub" contenteditable="true">compromissos em aberto</span></div><div class="val" contenteditable="true">R$ 88.250,46</div></div>
+            <div class="line" data-role="apagar"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">A pagar</span><span class="sub" contenteditable="true">compromissos em aberto</span></div><div class="val" contenteditable="true">R$ 88.250,46</div></div>
           </div>
           <button class="addline ctrl" onclick="addLine(this)">+ adicionar linha</button>
         </div>
@@ -369,8 +373,8 @@ body:not(.editing) .addsection{display:none}
         <button class="sbtn x" onclick="delSec(this)" title="Remover seção">&#10005;</button>
       </div>
       <div class="deficit">
-        <div class="dl"><span contenteditable="true">Déficit de receita para cobrir as despesas</span><small contenteditable="true">o que falta entrar para zerar o que está a pagar</small></div>
-        <div class="dv" contenteditable="true">R$ 21.885,00</div>
+        <div class="dl"><span class="calc" contenteditable="false">Déficit de receita para cobrir as despesas</span><small class="calc" contenteditable="false">o que falta entrar para zerar o que está a pagar</small></div>
+        <div class="dv calc" contenteditable="false">R$ 21.885,00</div>
       </div>
     </div>
 
@@ -614,20 +618,86 @@ function fmtBR(n, dec) {
   return n.toLocaleString('pt-BR', {minimumFractionDigits: dec, maximumFractionDigits: dec});
 }
 
-/* ===== PROJEÇÃO ===== */
+/* ===== POSIÇÃO E PROJEÇÃO ===== */
+var INAD = 0.10; /* inadimplência fixa aplicada sobre "A receber" */
+
+/* lê o valor de uma linha pelo data-role (com fallback por nome do rótulo) */
+function lineVal(card, role, keywords) {
+  if (!card) return 0;
+  var lines = card.querySelectorAll('.line');
+  for (var i = 0; i < lines.length; i++) {
+    var ln = lines[i];
+    var match = ln.getAttribute('data-role') === role;
+    if (!match) {
+      var lbl = ln.querySelector('.lbl span');
+      var name = lbl ? lbl.textContent.trim().toLowerCase() : '';
+      for (var k = 0; k < keywords.length; k++) {
+        if (name.indexOf(keywords[k]) > -1) { match = true; break; }
+      }
+    }
+    if (match) {
+      var v = ln.querySelector('.val');
+      return v ? parseBR(v.textContent) : 0;
+    }
+  }
+  return 0;
+}
+
+/* trava um campo derivado para não ser editado manualmente */
+function lockCalc(el) {
+  if (el) { el.classList.add('calc'); el.setAttribute('contenteditable', 'false'); }
+}
+
 function recalc() {
-  var dias  = parseBR(document.getElementById('pDias').value);
-  var ritmo = parseBR(document.getElementById('pRitmo').value);
-  var def   = parseBR(document.getElementById('pDef').value);
-  var enter = dias * ritmo, res = enter - def;
-  document.getElementById('valEnter').textContent = 'R$ ' + fmtBR(enter);
-  document.getElementById('valDef').textContent   = 'R$ ' + fmtBR(def);
-  var mx = Math.max(enter, def, 1);
-  document.getElementById('barEnter').style.width = (enter / mx * 100) + '%';
-  document.getElementById('barDef').style.width   = (def   / mx * 100) + '%';
-  var el = document.getElementById('resultCalc');
-  el.textContent = (res >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(res));
-  el.className = 'rv ' + (res >= 0 ? 'pos' : 'neg');
+  try {
+    var rec  = document.querySelector('.fincard.rec');
+    var desp = document.querySelector('.fincard.desp');
+    var saldo     = lineVal(rec,  'saldo',     ['saldo em conta', 'saldo']);
+    var receber   = lineVal(rec,  'receber',   ['a receber', 'receber']);
+    var atrasados = lineVal(rec,  'atrasados', ['atrasado']);
+    var aPagar    = lineVal(desp, 'apagar',    ['a pagar']);
+
+    /* posição = saldo + a receber (−10%) + atrasados − a pagar */
+    var posicao = saldo + receber * (1 - INAD) + atrasados - aPagar;
+    var deficit = posicao < 0 ? -posicao : 0; /* receita nova p/ cobrir o "a pagar" */
+    var superavit = posicao > 0;              /* cobriu e ultrapassou o "a pagar" */
+
+    var box     = document.querySelector('.deficit');
+    var dv      = document.querySelector('.deficit .dv');
+    var dlSpan  = document.querySelector('.deficit .dl span');
+    var dlSmall = document.querySelector('.deficit .dl small');
+    if (box) box.classList.toggle('super', superavit);
+    if (dlSpan)  { lockCalc(dlSpan);  dlSpan.textContent  = superavit ? 'Superávit de caixa' : 'Déficit de receita para cobrir as despesas'; }
+    if (dlSmall) { lockCalc(dlSmall); dlSmall.textContent = superavit ? 'sobra após cobrir tudo o que está a pagar' : 'o que falta entrar para zerar o que está a pagar'; }
+    if (dv) { lockCalc(dv); dv.textContent = superavit ? '+R$ ' + fmtBR(posicao) : 'R$ ' + fmtBR(deficit); }
+    var pDefEl = document.getElementById('pDef');
+    if (pDefEl) { pDefEl.value = fmtBR(deficit); pDefEl.readOnly = true; }
+
+    var diasEl  = document.getElementById('pDias');
+    var ritmoEl = document.getElementById('pRitmo');
+    var dias  = diasEl  ? parseBR(diasEl.value)  : 0;
+    var ritmo = ritmoEl ? parseBR(ritmoEl.value) : 0;
+    var enter = dias * ritmo;       /* receita nova a entrar nos dias restantes */
+    var res   = enter - deficit;    /* resultado projetado: cobre o déficit? */
+
+    var vEnter = document.getElementById('valEnter');
+    var vDef   = document.getElementById('valDef');
+    if (vEnter) vEnter.textContent = 'R$ ' + fmtBR(enter);
+    if (vDef)   vDef.textContent   = 'R$ ' + fmtBR(deficit);
+    var mx = Math.max(enter, deficit, 1);
+    var bEnter = document.getElementById('barEnter');
+    var bDef   = document.getElementById('barDef');
+    if (bEnter) bEnter.style.width = (enter   / mx * 100) + '%';
+    if (bDef)   bDef.style.width   = (deficit / mx * 100) + '%';
+    var el = document.getElementById('resultCalc');
+    if (el) {
+      el.textContent = (res >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(res));
+      el.className = 'rv ' + (res >= 0 ? 'pos' : 'neg');
+    }
+
+    var hv = document.querySelector('.hero .hv');
+    if (hv) { lockCalc(hv); hv.textContent = '≈ ' + (res >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(res), 0); }
+  } catch (e) {}
 }
 /* ===== LINHAS ===== */
 function addLine(btn) {
@@ -673,6 +743,7 @@ function addSec() {
 function toggleEdit() {
   var ed = document.body.classList.toggle('editing');
   document.querySelectorAll('[contenteditable]').forEach(function(e) {
+    if (e.classList.contains('calc')) return; /* campos derivados não são editáveis */
     e.setAttribute('contenteditable', ed ? 'true' : 'false');
   });
   document.getElementById('editToggle').textContent = ed ? '\u{1F441} Pré-visualizar' : '✎ Editar';
@@ -949,17 +1020,14 @@ function drawCompareSvg(falta) {
 /* ===== EVENTOS E PERSISTÊNCIA ===== */
 
 function bindEvents() {
-  ['pDias','pRitmo','pDef'].forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) el.addEventListener('input', recalc);
-  });
   var mcIds = ['exMin','exMode','exMax','rdMin','rdMode','rdMax','vnMin','vnMode','vnMax','mcN','mcFalta'];
   mcIds.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.addEventListener('change', runMC);
   });
-  // Salva em qualquer edição do documento (texto, inputs, selects).
+  // Em qualquer edição: recalcula posição/projeção e agenda salvamento.
   ['input', 'change', 'focusout'].forEach(function(ev) {
+    document.addEventListener(ev, recalc, true);
     document.addEventListener(ev, scheduleSave, true);
   });
   window.addEventListener('beforeunload', persistData);
