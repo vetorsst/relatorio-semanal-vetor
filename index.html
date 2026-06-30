@@ -135,7 +135,7 @@ body.app{padding:78px 16px 40px}
 
 /* ---------- Projeção ---------- */
 .proj{border:1px solid var(--line);border-radius:13px;padding:22px;margin-top:14px;background:#fcfdfd}
-.drivers{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+.drivers{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px;margin-bottom:18px}
 .driver{background:#f5f8f9;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
 .driver label{display:block;font-size:11px;font-weight:600;color:var(--muted);
   text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
@@ -345,7 +345,7 @@ body:not(.editing) .addsection{display:none}
         <div class="fincard rec">
           <div class="ch"><span contenteditable="true">Receita</span></div>
           <div class="linelist">
-            <div class="line"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Caixa gerado</span><span class="sub" contenteditable="true">entrou de fato na semana</span></div><div class="val" contenteditable="true">R$ 89.566,43</div></div>
+            <div class="line" data-role="caixa"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Caixa gerado</span><span class="sub" contenteditable="true">entrou de fato no mês · base do ritmo diário</span></div><div class="val" contenteditable="true">R$ 89.566,43</div></div>
             <div class="line" data-role="receber"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">A receber</span><span class="sub" contenteditable="true">títulos em aberto a vencer · considera −10% inadimplência</span></div><div class="val" contenteditable="true">R$ 36.882,76</div></div>
             <div class="line" data-role="atrasados"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Atrasados</span><span class="sub" contenteditable="true">inadimplência da semana</span></div><div class="val" contenteditable="true">R$ 4.640,00</div></div>
             <div class="line" data-role="saldo"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Saldo em conta</span><span class="sub" contenteditable="true">posição atual</span></div><div class="val" contenteditable="true">R$ 25.043,84</div></div>
@@ -389,9 +389,11 @@ body:not(.editing) .addsection{display:none}
       <h2 contenteditable="true">Quanto ainda entra até fechar a semana</h2>
       <div class="proj">
         <div class="drivers">
-          <div class="driver"><label contenteditable="true">Dias úteis restantes</label><input id="pDias" value="7" inputmode="numeric"></div>
-          <div class="driver"><label contenteditable="true">Ritmo diário de receita</label><input id="pRitmo" value="6.398,00"></div>
-          <div class="driver"><label contenteditable="true">Déficit a cobrir</label><input id="pDef" value="21.885,00"></div>
+          <div class="driver"><label>Dias úteis do mês</label><input id="pTotal" readonly></div>
+          <div class="driver"><label>Dias úteis decorridos</label><input id="pDecorr" readonly></div>
+          <div class="driver"><label>Dias úteis restantes</label><input id="pDias" readonly></div>
+          <div class="driver"><label>Ritmo diário de receita</label><input id="pRitmo" readonly></div>
+          <div class="driver"><label>Déficit a cobrir</label><input id="pDef" readonly></div>
         </div>
         <div class="bars">
           <div class="barrow"><span class="bl">A entrar</span><div class="bartrack"><div class="barfill enter" id="barEnter" style="width:100%"></div></div><span class="barval" id="valEnter">R$ 44.786,00</span></div>
@@ -648,6 +650,24 @@ function lockCalc(el) {
   if (el) { el.classList.add('calc'); el.setAttribute('contenteditable', 'false'); }
 }
 
+/* conta dias úteis (seg–sex) do mês; se untilDay != null, só até esse dia */
+function bizDays(year, month, untilDay) {
+  var d = new Date(year, month, 1), count = 0;
+  while (d.getMonth() === month) {
+    if (untilDay != null && d.getDate() > untilDay) break;
+    var wd = d.getDay();
+    if (wd !== 0 && wd !== 6) count++;
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
+}
+
+/* preenche um campo derivado (input) e o trava */
+function setField(id, val) {
+  var el = document.getElementById(id);
+  if (el) { el.value = val; el.readOnly = true; }
+}
+
 function recalc() {
   try {
     var rec  = document.querySelector('.fincard.rec');
@@ -673,11 +693,23 @@ function recalc() {
     var pDefEl = document.getElementById('pDef');
     if (pDefEl) { pDefEl.value = fmtBR(deficit); pDefEl.readOnly = true; }
 
-    var diasEl  = document.getElementById('pDias');
-    var ritmoEl = document.getElementById('pRitmo');
-    var dias  = diasEl  ? parseBR(diasEl.value)  : 0;
-    var ritmo = ritmoEl ? parseBR(ritmoEl.value) : 0;
-    var enter = dias * ritmo;       /* receita nova a entrar nos dias restantes */
+    /* dias úteis do mês a partir da data de hoje */
+    var now = new Date();
+    var y = now.getFullYear(), mo = now.getMonth(), td = now.getDate();
+    var totalDU   = bizDays(y, mo, null);
+    var decorr    = bizDays(y, mo, td);            /* dias úteis já ocorridos (inclui hoje) */
+    var restantes = Math.max(totalDU - decorr, 0); /* diminui a cada dia útil que passa */
+
+    /* ritmo diário = caixa gerado ÷ dias úteis decorridos */
+    var caixa = lineVal(rec, 'caixa', ['caixa gerado', 'caixa']);
+    var ritmo = decorr > 0 ? caixa / decorr : 0;
+
+    setField('pTotal',  String(totalDU));
+    setField('pDecorr', String(decorr));
+    setField('pDias',   String(restantes));
+    setField('pRitmo',  fmtBR(ritmo));
+
+    var enter = restantes * ritmo;  /* a entrar nos dias úteis restantes (ritmo × restantes) */
     var res   = enter - deficit;    /* resultado projetado: cobre o déficit? */
 
     var vEnter = document.getElementById('valEnter');
