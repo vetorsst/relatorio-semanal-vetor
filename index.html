@@ -662,6 +662,17 @@ function bizDays(year, month, untilDay) {
   return count;
 }
 
+/* conta dias úteis (seg–sex) do mês a partir de fromDay (inclusive) até o fim */
+function bizDaysFrom(year, month, fromDay) {
+  var d = new Date(year, month, 1), count = 0;
+  while (d.getMonth() === month) {
+    var wd = d.getDay();
+    if (wd !== 0 && wd !== 6 && d.getDate() >= fromDay) count++;
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
+}
+
 /* preenche um campo derivado (input) e o trava */
 function setField(id, val) {
   var el = document.getElementById(id);
@@ -697,12 +708,12 @@ function recalc() {
     var now = new Date();
     var y = now.getFullYear(), mo = now.getMonth(), td = now.getDate();
     var totalDU   = bizDays(y, mo, null);
-    var decorr    = bizDays(y, mo, td);            /* dias úteis já ocorridos (inclui hoje) */
-    var restantes = Math.max(totalDU - decorr, 0); /* diminui a cada dia útil que passa */
+    var restantes = bizDaysFrom(y, mo, td);  /* hoje (inclusive) até o fim do mês; diminui a cada dia útil */
+    var decorr    = totalDU - restantes;     /* dias úteis concluídos antes de hoje */
 
-    /* ritmo diário = caixa gerado ÷ dias úteis decorridos */
+    /* ritmo diário = caixa gerado ÷ dias úteis decorridos (mín. 1 p/ não dividir por zero) */
     var caixa = lineVal(rec, 'caixa', ['caixa gerado', 'caixa']);
-    var ritmo = decorr > 0 ? caixa / decorr : 0;
+    var ritmo = caixa / Math.max(decorr, 1);
 
     setField('pTotal',  String(totalDU));
     setField('pDecorr', String(decorr));
