@@ -72,6 +72,7 @@ body.app{padding:78px 16px 40px}
 .tbtn.primary:hover{filter:brightness(.95)}
 .hint{font-size:11px;color:#9fc0d2;font-weight:400;margin-left:4px}
 .save-toast{font-size:11px;color:#6fcf97;font-weight:600;opacity:0;transition:opacity .3s;white-space:nowrap}
+.save-toast.saving{color:#9fc0d2}
 
 /* ---------- Page ---------- */
 .page{max-width:860px;margin:0 auto;background:var(--card);border-radius:16px;overflow:hidden;
@@ -649,6 +650,7 @@ function moveSec(btn, dir) {
     sec.parentNode.insertBefore(sec, sec.previousElementSibling);
   if (dir > 0 && sec.nextElementSibling && sec.nextElementSibling.classList.contains('section'))
     sec.parentNode.insertBefore(sec.nextElementSibling, sec);
+  scheduleSave();
 }
 function delSec(btn) { if (confirm('Remover esta seção?')) { btn.closest('.section').remove(); scheduleSave(); } }
 function addSec() {
@@ -664,6 +666,7 @@ function addSec() {
     '<div class="obs"><p contenteditable="true">Escreva aqui o conteúdo desta seção.</p></div>';
   addBtn.parentNode.insertBefore(sec, addBtn);
   sec.querySelector('h2').focus();
+  scheduleSave();
 }
 
 /* ===== MODO EDIÇÃO ===== */
@@ -857,6 +860,16 @@ function runMC() {
   drawHisto('mcSvg', res, falta, st, 1);
 }
 
+/* serializa cenários salvos para persistência (res arredondado p/ limitar tamanho) */
+function serializeScenarios() {
+  function pack(s) {
+    if (!s) return null;
+    return { res: s.res.map(function(v) { return Math.round(v); }), st: s.st };
+  }
+  if (!mcLastBase && !mcLastPess) return null;
+  return { base: pack(mcLastBase), pess: pack(mcLastPess) };
+}
+
 function saveScenario(type) {
   if (!mcLastRun) return;
   var falta = getN('mcFalta');
@@ -882,6 +895,7 @@ function saveScenario(type) {
     document.getElementById('cmpPessProb').textContent = mcPct(mcLastPess.st.prob);
     drawCompareSvg(falta);
   }
+  scheduleSave();
 }
 
 function drawCompareSvg(falta) {
@@ -944,22 +958,23 @@ function bindEvents() {
     var el = document.getElementById(id);
     if (el) el.addEventListener('change', runMC);
   });
-  var sec = document.getElementById('sections');
-  if (sec) {
-    sec.addEventListener('input', scheduleSave);
-    sec.addEventListener('change', scheduleSave);
-    sec.addEventListener('focusout', scheduleSave);
-  }
-  var head = document.querySelector('.head');
-  if (head) head.addEventListener('focusout', scheduleSave);
-  var foot = document.querySelector('.foot');
-  if (foot) foot.addEventListener('focusout', scheduleSave);
+  // Salva em qualquer edição do documento (texto, inputs, selects).
+  ['input', 'change', 'focusout'].forEach(function(ev) {
+    document.addEventListener(ev, scheduleSave, true);
+  });
   window.addEventListener('beforeunload', persistData);
 }
 
 var saveTimer;
 function scheduleSave() {
   clearTimeout(saveTimer);
+  var toast = document.getElementById('saveToast');
+  if (toast) {
+    clearTimeout(toast._t);
+    toast.classList.add('saving');
+    toast.innerHTML = 'Salvando&#8230;';
+    toast.style.opacity = '1';
+  }
   saveTimer = setTimeout(persistData, 700);
 }
 
@@ -977,13 +992,16 @@ function persistData() {
       sections: document.getElementById('sections').innerHTML,
       h1:     h1el ? h1el.innerHTML  : '',
       period: pel  ? pel.innerHTML   : '',
-      foot:   fel  ? fel.innerHTML   : ''
+      foot:   fel  ? fel.innerHTML   : '',
+      mc:     serializeScenarios()
     }));
     var toast = document.getElementById('saveToast');
     if (toast) {
+      toast.classList.remove('saving');
+      toast.innerHTML = '&#10003; Salvo';
       toast.style.opacity = '1';
       clearTimeout(toast._t);
-      toast._t = setTimeout(function() { toast.style.opacity = '0'; }, 1800);
+      toast._t = setTimeout(function() { toast.style.opacity = '0'; }, 1500);
     }
   } catch(e) {}
 }
@@ -1002,7 +1020,25 @@ function restoreData() {
     if (d.period && pel) pel.innerHTML = d.period;
     var fel = document.querySelector('.foot');
     if (d.foot && fel) fel.innerHTML = d.foot;
+    restoreScenarios(d.mc);
   } catch(e) {}
+}
+
+/* reconstrói cenários Monte Carlo salvos e o quadro de comparação */
+function restoreScenarios(mc) {
+  if (!mc) return;
+  mcLastBase = mc.base || null;
+  mcLastPess = mc.pess || null;
+  if (mcLastBase && mcLastPess) {
+    var falta = getN('mcFalta');
+    document.getElementById('mcCompareHint').style.display = 'none';
+    document.getElementById('mcCompare').style.display = '';
+    document.getElementById('cmpBaseP50').textContent  = mcFmt(mcLastBase.st.p50);
+    document.getElementById('cmpBaseProb').textContent = mcPct(mcLastBase.st.prob);
+    document.getElementById('cmpPessP50').textContent  = mcFmt(mcLastPess.st.p50);
+    document.getElementById('cmpPessProb').textContent = mcPct(mcLastPess.st.prob);
+    drawCompareSvg(falta);
+  }
 }
 </script>
 
