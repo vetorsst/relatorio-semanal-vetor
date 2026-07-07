@@ -624,7 +624,8 @@ function fmtBR(n, dec) {
 }
 
 /* ===== POSIÇÃO E PROJEÇÃO ===== */
-var INAD = 0.10; /* inadimplência fixa aplicada sobre "A receber" */
+var INAD = 0.10;          /* inadimplência fixa aplicada sobre "A receber" */
+var MIN_DIAS_PROJ = 5;    /* dias úteis mínimos decorridos p/ extrapolar o ritmo (evita ruído de início de mês) */
 
 /* localiza uma linha pelo data-role (com fallback por nome do rótulo) */
 function findLine(card, role, keywords) {
@@ -725,6 +726,7 @@ function recalc() {
 
     /* posição = saldo + a receber (−10%) + atrasados − a pagar */
     var posicao = saldo + receber * (1 - INAD) + atrasados - aPagar;
+    if (!isFinite(posicao)) posicao = 0;
     var deficit = posicao < 0 ? -posicao : 0; /* receita nova p/ cobrir o "a pagar" */
     var superavit = posicao > 0;              /* cobriu e ultrapassou o "a pagar" */
 
@@ -764,18 +766,23 @@ function recalc() {
     /* ritmo diário = caixa gerado ÷ dias úteis decorridos (mín. 1 p/ não dividir por zero) */
     var caixa = lineVal(rec, 'caixa', ['caixa gerado', 'caixa']);
     var ritmo = caixa / Math.max(decorr, 1);
+    if (!isFinite(ritmo)) ritmo = 0;
 
     setField('pTotal',  String(totalDU));
     setField('pDecorr', String(decorr));
     setField('pDias',   String(restantes));
     setField('pRitmo',  fmtBR(ritmo));
 
-    var enter = restantes * ritmo;  /* a entrar nos dias úteis restantes (ritmo × restantes) */
-    var res   = posicao + enter;    /* fechamento projetado = posição atual + o que ainda entra */
+    /* warm-up: só extrapola o ritmo após dias úteis suficientes (evita ruído de início de mês) */
+    var projOk = decorr >= MIN_DIAS_PROJ && restantes > 0;
+    var enter = projOk ? restantes * ritmo : 0;  /* a entrar nos dias úteis restantes */
+    if (!isFinite(enter)) enter = 0;
+    var res = posicao + enter;                   /* fechamento projetado = posição atual + o que ainda entra */
+    if (!isFinite(res)) res = 0;
 
     var vEnter = document.getElementById('valEnter');
     var vDef   = document.getElementById('valDef');
-    if (vEnter) vEnter.textContent = 'R$ ' + fmtBR(enter);
+    if (vEnter) vEnter.textContent = projOk ? 'R$ ' + fmtBR(enter) : '—';
     if (vDef)   vDef.textContent   = 'R$ ' + fmtBR(deficit);
     var mx = Math.max(enter, deficit, 1);
     var bEnter = document.getElementById('barEnter');
@@ -786,6 +793,13 @@ function recalc() {
     if (el) {
       el.textContent = (res >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(res));
       el.className = 'rv ' + (res >= 0 ? 'pos' : 'neg');
+    }
+    var rlSmall = document.querySelector('.result .rl small');
+    if (rlSmall) {
+      lockCalc(rlSmall);
+      rlSmall.textContent = projOk
+        ? '(posição atual + a entrar nos dias restantes) · estimativa'
+        : 'aguardando ' + MIN_DIAS_PROJ + ' dias úteis para projetar o ritmo (decorridos: ' + decorr + ')';
     }
 
     var hv = document.querySelector('.hero .hv');
@@ -816,10 +830,12 @@ function recalc() {
         ? 'a posição já é superavitária em R$ ' + fmtBR(posicao)
         : (deficit > 0 ? 'ainda há um déficit de R$ ' + fmtBR(deficit) + ' a cobrir' : 'a posição está equilibrada');
       var closeTxt = (res >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(res));
+      var ritmoFrase = projOk
+        ? 'Mantido o ritmo diário de R$ ' + fmtBR(ritmo) + ' até o fim do mês, o fechamento projetado é de aproximadamente ' + closeTxt + '.'
+        : 'Com ' + decorr + ' dia(s) útil(eis) decorrido(s), a projeção do ritmo (R$ ' + fmtBR(ritmo) + '/dia) fica disponível a partir de ' + MIN_DIAS_PROJ + ' dias úteis.';
       obsP.textContent =
-        diasTxt + ' em ' + monthName + ' e o ritmo diário de receita está em R$ ' + fmtBR(ritmo) + '. ' +
-        'Considerando 10% de inadimplência sobre "A receber", ' + posTxt + '. ' +
-        'Mantido esse ritmo até o fim do mês, o fechamento projetado é de aproximadamente ' + closeTxt + '.';
+        diasTxt + ' em ' + monthName + '. ' +
+        'Considerando 10% de inadimplência sobre "A receber", ' + posTxt + '. ' + ritmoFrase;
     }
 
     /* Monte Carlo: "Falta a cobrir" = déficit calculado; re-simula quando muda */
