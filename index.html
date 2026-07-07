@@ -659,6 +659,18 @@ function setLineSub(ln, text) {
   if (sub) { lockCalc(sub); sub.textContent = text; }
 }
 
+/* localiza o parágrafo da seção "Observações" (pelo título, robusto ao localStorage) */
+function findObsP() {
+  var secs = document.querySelectorAll('#sections .section');
+  for (var i = 0; i < secs.length; i++) {
+    var h2 = secs[i].querySelector('h2');
+    if (h2 && h2.textContent.toLowerCase().indexOf('observ') > -1) {
+      return secs[i].querySelector('.obs p');
+    }
+  }
+  return null;
+}
+
 /* trava um campo derivado para não ser editado manualmente */
 function lockCalc(el) {
   if (el) { el.classList.add('calc'); el.setAttribute('contenteditable', 'false'); }
@@ -794,6 +806,21 @@ function recalc() {
     setLineSub(findLine(rec,  'saldo',     ['saldo em conta', 'saldo']), 'posição atual em conta');
     setLineSub(findLine(desp, 'apagar',    ['a pagar']),                 'compromissos em aberto no mês');
     setLineSub(findLine(desp, 'paga',      ['paga']),                    'já liquidada no mês');
+
+    /* Observações: resumo gerado automaticamente */
+    var obsP = findObsP();
+    if (obsP) {
+      lockCalc(obsP);
+      var diasTxt = (restantes === 1 ? 'Resta 1 dia útil' : 'Restam ' + restantes + ' dias úteis');
+      var posTxt = superavit
+        ? 'a posição já é superavitária em R$ ' + fmtBR(posicao)
+        : (deficit > 0 ? 'ainda há um déficit de R$ ' + fmtBR(deficit) + ' a cobrir' : 'a posição está equilibrada');
+      var closeTxt = (res >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(res));
+      obsP.textContent =
+        diasTxt + ' em ' + monthName + ' e o ritmo diário de receita está em R$ ' + fmtBR(ritmo) + '. ' +
+        'Considerando 10% de inadimplência sobre "A receber", ' + posTxt + '. ' +
+        'Mantido esse ritmo até o fim do mês, o fechamento projetado é de aproximadamente ' + closeTxt + '.';
+    }
 
     /* Monte Carlo: "Falta a cobrir" = déficit calculado; re-simula quando muda */
     var mcFaltaEl = document.getElementById('mcFalta');
