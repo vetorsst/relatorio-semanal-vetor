@@ -630,8 +630,7 @@ function fmtBR(n, dec) {
 }
 
 /* ===== POSIÇÃO E PROJEÇÃO ===== */
-var INAD = 0.10;          /* inadimplência fixa aplicada sobre "A receber" */
-var MIN_DIAS_PROJ = 5;    /* dias úteis mínimos decorridos p/ extrapolar o ritmo (evita ruído de início de mês) */
+var INAD = 0.10;          /* inadimplência fixa aplicada sobre a receita projetada */
 
 /* localiza uma linha pelo data-role (com fallback por nome do rótulo) */
 function findLine(card, role, keywords) {
@@ -796,12 +795,9 @@ function recalc() {
     var ritmoRec = caixa / Math.max(decorr, 1);
     if (!isFinite(ritmoRec)) ritmoRec = 0;
 
-    /* warm-up: só projeta o ritmo após dias úteis suficientes (evita ruído de início de mês) */
-    var projOk = decorr >= MIN_DIAS_PROJ && restantes > 0;
-
     /* RECEITA = Caixa gerado + (ritmo × dias restantes) + A receber + Atrasados, com −10% sobre o total.
-       DESPESA = fixa = Paga + A pagar (sem ritmo). */
-    var ritmoContrib = projOk ? ritmoRec * restantes : 0;
+       Ritmo considerado desde o início. DESPESA = fixa = Paga + A pagar (sem ritmo). */
+    var ritmoContrib = ritmoRec * restantes;
     var receitaBruta = caixa + ritmoContrib + receber + atrasados;
     var receitaProj  = receitaBruta * (1 - INAD);
     var despesaProj  = pagaVal + aPagar;
@@ -827,10 +823,8 @@ function recalc() {
     setRV('resultMes', resultMes);
     setRV('saldoProj', saldoFinal);
     var projNote = document.getElementById('projNote');
-    if (projNote) projNote.textContent = (projOk
-      ? 'Receita: Caixa gerado + ritmo diário até o fim de ' + monthName + ' + A receber + Atrasados, com −10% de inadimplência. '
-      : 'Receita pelos valores conhecidos (o ritmo diário entra a partir de ' + MIN_DIAS_PROJ + ' dias úteis; decorridos: ' + decorr + '), com −10% de inadimplência. ') +
-      'Despesa fixa = Paga + A pagar.';
+    if (projNote) projNote.textContent =
+      'Receita: Caixa gerado + ritmo diário × dias restantes + A receber + Atrasados, com −10% de inadimplência sobre o total. Despesa fixa = Paga + A pagar.';
 
     /* destaque (hero) = saldo final projetado */
     var heroVal = saldoFinal;
@@ -858,11 +852,8 @@ function recalc() {
       var posTxt = superavit
         ? 'a posição de hoje já é superavitária em R$ ' + fmtBR(posicao)
         : (deficit > 0 ? 'a posição de hoje tem déficit de R$ ' + fmtBR(deficit) : 'a posição de hoje está equilibrada');
-      var ritmoFrase = projOk
-        ? 'Ritmo diário de receita R$ ' + fmtBR(ritmoRec) + '. '
-        : 'Ritmo diário entra a partir de ' + MIN_DIAS_PROJ + ' dias úteis (decorridos: ' + decorr + '). ';
       obsP.textContent =
-        diasTxt + ' em ' + monthName + '. ' + ritmoFrase +
+        diasTxt + ' em ' + monthName + '. Ritmo diário de receita R$ ' + fmtBR(ritmoRec) + '. ' +
         'Projeção do mês — receita R$ ' + fmtBR(receitaProj) + ' (já com −10% de inadimplência), despesa fixa R$ ' + fmtBR(despesaProj) + ' (Paga + A pagar), resultado ' + sig(resultMes) + '. ' +
         'Saldo final projetado: ' + sig(saldoFinal) + '. Posição de hoje: ' + posTxt + '.';
     }
