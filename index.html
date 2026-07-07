@@ -359,7 +359,7 @@ body:not(.editing) .addsection{display:none}
         <div class="fincard desp">
           <div class="ch"><span contenteditable="true">Despesa</span></div>
           <div class="linelist">
-            <div class="line"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Paga</span><span class="sub" contenteditable="true">liquidada na semana</span></div><div class="val" contenteditable="true">R$ 76.120,71</div></div>
+            <div class="line" data-role="paga"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Paga</span><span class="sub" contenteditable="true">liquidada na semana</span></div><div class="val" contenteditable="true">R$ 76.120,71</div></div>
             <div class="line" data-role="apagar"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">A pagar</span><span class="sub" contenteditable="true">compromissos em aberto</span></div><div class="val" contenteditable="true">R$ 88.250,46</div></div>
           </div>
           <button class="addline ctrl" onclick="addLine(this)">+ adicionar linha</button>
@@ -626,9 +626,9 @@ function fmtBR(n, dec) {
 /* ===== POSIÇÃO E PROJEÇÃO ===== */
 var INAD = 0.10; /* inadimplência fixa aplicada sobre "A receber" */
 
-/* lê o valor de uma linha pelo data-role (com fallback por nome do rótulo) */
-function lineVal(card, role, keywords) {
-  if (!card) return 0;
+/* localiza uma linha pelo data-role (com fallback por nome do rótulo) */
+function findLine(card, role, keywords) {
+  if (!card) return null;
   var lines = card.querySelectorAll('.line');
   for (var i = 0; i < lines.length; i++) {
     var ln = lines[i];
@@ -640,12 +640,23 @@ function lineVal(card, role, keywords) {
         if (name.indexOf(keywords[k]) > -1) { match = true; break; }
       }
     }
-    if (match) {
-      var v = ln.querySelector('.val');
-      return v ? parseBR(v.textContent) : 0;
-    }
+    if (match) return ln;
   }
-  return 0;
+  return null;
+}
+
+/* lê o valor numérico de uma linha */
+function lineVal(card, role, keywords) {
+  var ln = findLine(card, role, keywords);
+  var v = ln ? ln.querySelector('.val') : null;
+  return v ? parseBR(v.textContent) : 0;
+}
+
+/* define o subtítulo (.sub) de uma linha e o trava */
+function setLineSub(ln, text) {
+  if (!ln) return;
+  var sub = ln.querySelector('.lbl .sub');
+  if (sub) { lockCalc(sub); sub.textContent = text; }
 }
 
 /* trava um campo derivado para não ser editado manualmente */
@@ -767,6 +778,22 @@ function recalc() {
 
     var hv = document.querySelector('.hero .hv');
     if (hv) { lockCalc(hv); hv.textContent = '≈ ' + (res >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(res), 0); }
+
+    /* textos automáticos: hero + subtítulos das linhas (refletem o mês/estado) */
+    var monthName = new Date(y, mo, 1).toLocaleDateString('pt-BR', {month: 'long'});
+    var hl = document.querySelector('.hero .hl');
+    if (hl) { lockCalc(hl); hl.textContent = 'Projeção de fechamento de ' + monthName; }
+    var hs = document.querySelector('.hero .hs');
+    if (hs) { lockCalc(hs); hs.textContent = 'Estimativa mantendo o ritmo diário de receita até o fim do mês.'; }
+    var badge = document.querySelector('.hero .badge span');
+    if (badge) { lockCalc(badge); badge.textContent = res >= 0 ? 'Positiva' : 'Negativa'; }
+
+    setLineSub(findLine(rec,  'caixa',     ['caixa gerado', 'caixa']),   'entrou de fato no mês · base do ritmo diário');
+    setLineSub(findLine(rec,  'receber',   ['a receber', 'receber']),    'títulos a vencer · considera −10% de inadimplência');
+    setLineSub(findLine(rec,  'atrasados', ['atrasado']),                'títulos vencidos e ainda não pagos');
+    setLineSub(findLine(rec,  'saldo',     ['saldo em conta', 'saldo']), 'posição atual em conta');
+    setLineSub(findLine(desp, 'apagar',    ['a pagar']),                 'compromissos em aberto no mês');
+    setLineSub(findLine(desp, 'paga',      ['paga']),                    'já liquidada no mês');
 
     /* Monte Carlo: "Falta a cobrir" = déficit calculado; re-simula quando muda */
     var mcFaltaEl = document.getElementById('mcFalta');
