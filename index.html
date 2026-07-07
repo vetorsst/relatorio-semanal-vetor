@@ -801,20 +801,24 @@ function recalc() {
     /* warm-up: só extrapola após dias úteis suficientes (evita ruído de início de mês) */
     var projOk = decorr >= MIN_DIAS_PROJ && restantes > 0;
 
-    /* projeção do mês — despesa = ritmo + "A pagar" conhecido */
-    var receitaProj = caixa   + ritmoRec  * restantes;
-    var despesaProj = pagaVal + ritmoDesp * restantes + aPagar;
-    var resultMes   = receitaProj - despesaProj;                    /* resultado do mês (receita − despesa) */
-    var saldoProj   = posicao + (ritmoRec - ritmoDesp) * restantes; /* saldo de caixa projetado no fim do mês */
+    /* entradas/saídas restantes: ritmo diário (quando confiável) OU recebíveis/contas conhecidas.
+       max() evita dupla contagem — o ritmo já tende a incluir a cobrança/pagamento do que é conhecido. */
+    var aReceberNet = receber * (1 - INAD);
+    var entradasRest = projOk ? Math.max(ritmoRec  * restantes, aReceberNet + atrasados) : (aReceberNet + atrasados);
+    var saidasRest   = projOk ? Math.max(ritmoDesp * restantes, aPagar)                  : aPagar;
+
+    var receitaProj = caixa   + entradasRest;              /* receita realizada + a entrar */
+    var despesaProj = pagaVal + saidasRest;                /* despesa realizada + a sair    */
+    var resultMes   = receitaProj - despesaProj;           /* resultado do mês */
+    var saldoProj   = saldo + entradasRest - saidasRest;   /* saldo de caixa projetado no fim do mês */
     if (!isFinite(receitaProj)) receitaProj = 0;
     if (!isFinite(despesaProj)) despesaProj = 0;
     if (!isFinite(resultMes))   resultMes   = 0;
-    if (!isFinite(saldoProj))   saldoProj   = posicao;
+    if (!isFinite(saldoProj))   saldoProj   = 0;
 
     var sig = function (v) { return (v >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(v)); };
     var setPV = function (id, v) { var e = document.getElementById(id); if (e) e.textContent = 'R$ ' + fmtBR(v); };
     var setRV = function (id, v) { var e = document.getElementById(id); if (e) { e.textContent = sig(v); e.className = 'rv ' + (v >= 0 ? 'pos' : 'neg'); } };
-    var setDash = function (id, isRv) { var e = document.getElementById(id); if (e) { e.textContent = '—'; e.className = isRv ? 'rv' : 'pv'; } };
 
     ensureProjLayout();
     setField('pTotal',     String(totalDU));
@@ -823,22 +827,17 @@ function recalc() {
     setField('pRitmoRec',  fmtBR(ritmoRec));
     setField('pRitmoDesp', fmtBR(ritmoDesp));
 
-    if (projOk) {
-      setPV('receitaProj', receitaProj);
-      setPV('despesaProj', despesaProj);
-      setRV('resultMes', resultMes);
-      setRV('saldoProj', saldoProj);
-    } else {
-      setDash('receitaProj', false); setDash('despesaProj', false);
-      setDash('resultMes', true);    setDash('saldoProj', true);
-    }
+    setPV('receitaProj', receitaProj);
+    setPV('despesaProj', despesaProj);
+    setRV('resultMes', resultMes);
+    setRV('saldoProj', saldoProj);
     var projNote = document.getElementById('projNote');
     if (projNote) projNote.textContent = projOk
-      ? 'Projeção pelo ritmo diário de receita e despesa até o fim de ' + monthName + '.'
-      : 'Aguardando ' + MIN_DIAS_PROJ + ' dias úteis para projetar o ritmo (decorridos: ' + decorr + ').';
+      ? 'Projeção pelo ritmo diário (receita e despesa), com recebíveis e contas conhecidas como piso, até o fim de ' + monthName + '.'
+      : 'Projeção pelos recebíveis e contas conhecidas. O ritmo diário entra a partir de ' + MIN_DIAS_PROJ + ' dias úteis (decorridos: ' + decorr + ').';
 
     /* destaque (hero) = saldo de caixa projetado no fim do mês */
-    var heroVal = projOk ? saldoProj : posicao;
+    var heroVal = saldoProj;
     var hv = document.querySelector('.hero .hv');
     if (hv) { lockCalc(hv); hv.textContent = '≈ ' + (heroVal >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(heroVal), 0); }
     var hl = document.querySelector('.hero .hl');
@@ -865,10 +864,10 @@ function recalc() {
         : (deficit > 0 ? 'a posição de hoje tem déficit de R$ ' + fmtBR(deficit) : 'a posição de hoje está equilibrada');
       obsP.textContent = projOk
         ? (diasTxt + ' em ' + monthName + '. Ritmo diário: receita R$ ' + fmtBR(ritmoRec) + ', despesa R$ ' + fmtBR(ritmoDesp) + '. ' +
-           'Projeção do mês — receita ' + sig(receitaProj) + ', despesa ' + sig(despesaProj) + ', resultado ' + sig(resultMes) + '. ' +
+           'Projeção do mês — receita R$ ' + fmtBR(receitaProj) + ', despesa R$ ' + fmtBR(despesaProj) + ', resultado ' + sig(resultMes) + '. ' +
            'Saldo de caixa projetado no fim do mês: ' + sig(saldoProj) + '. Considerando 10% de inadimplência sobre "A receber", ' + posTxt + '.')
-        : (diasTxt + ' em ' + monthName + '. Com ' + decorr + ' dia(s) útil(eis) decorrido(s), a projeção do mês fica disponível a partir de ' + MIN_DIAS_PROJ + ' dias úteis. ' +
-           'Considerando 10% de inadimplência sobre "A receber", ' + posTxt + '.');
+        : (diasTxt + ' em ' + monthName + '. Projeção pelos recebíveis e contas conhecidas (o ritmo diário entra a partir de ' + MIN_DIAS_PROJ + ' dias úteis; decorridos: ' + decorr + '): ' +
+           'resultado ' + sig(resultMes) + ', saldo de caixa projetado ' + sig(saldoProj) + '. Considerando 10% de inadimplência sobre "A receber", ' + posTxt + '.');
     }
 
     /* Monte Carlo: "Falta a cobrir" = déficit calculado; re-simula quando muda */
