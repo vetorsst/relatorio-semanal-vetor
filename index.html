@@ -156,6 +156,12 @@ body.app{padding:78px 16px 40px}
 .barval{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
 .result{display:flex;align-items:center;justify-content:space-between;gap:14px;
   margin-top:6px;padding-top:16px;border-top:1px dashed var(--line)}
+.projgrid{margin:2px 0 6px}
+.projrow{display:flex;justify-content:space-between;align-items:center;padding:9px 2px;
+  border-bottom:1px solid var(--line);font-size:13.5px}
+.projrow .pk{color:var(--muted);font-weight:600}
+.projrow .pv{font-weight:700;font-variant-numeric:tabular-nums;color:var(--navy)}
+.projnote{font-size:11.5px;color:var(--muted);margin-top:12px;font-style:italic}
 .result .rl{font-size:13px;font-weight:600;color:var(--muted)}
 .result .rl small{display:block;font-size:11px;font-weight:400;color:#9aa8b0}
 .result .rv{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
@@ -660,6 +666,28 @@ function setLineSub(ln, text) {
   if (sub) { lockCalc(sub); sub.textContent = text; }
 }
 
+/* reconstrói o layout da seção Projeção (migra automaticamente dados antigos do localStorage) */
+function ensureProjLayout() {
+  var proj = document.querySelector('.proj');
+  if (!proj || document.getElementById('resultMes')) return;
+  proj.innerHTML =
+    '<div class="drivers">' +
+      '<div class="driver"><label>Dias úteis do mês</label><input id="pTotal" readonly></div>' +
+      '<div class="driver"><label>Decorridos</label><input id="pDecorr" readonly></div>' +
+      '<div class="driver"><label>Restantes</label><input id="pDias" readonly></div>' +
+      '<div class="driver"><label>Ritmo diário de receita</label><input id="pRitmoRec" readonly></div>' +
+      '<div class="driver"><label>Ritmo diário de despesa</label><input id="pRitmoDesp" readonly></div>' +
+    '</div>' +
+    '<div class="projgrid">' +
+      '<div class="projrow"><span class="pk">Receita projetada do mês</span><span class="pv" id="receitaProj">—</span></div>' +
+      '<div class="projrow"><span class="pk">Despesa projetada do mês</span><span class="pv" id="despesaProj">—</span></div>' +
+    '</div>' +
+    '<div class="result"><div class="rl"><span>Resultado do mês</span><small>receita projetada − despesa projetada</small></div><div class="rv" id="resultMes">—</div></div>' +
+    '<div class="result"><div class="rl"><span>Saldo de caixa projetado (fim do mês)</span><small>posição de hoje + fluxo novo líquido projetado</small></div><div class="rv" id="saldoProj">—</div></div>' +
+    '<div class="projnote" id="projNote"></div>' +
+    '<button class="recbtn ctrl" onclick="recalc()">&#8635; Atualizar projeção</button>';
+}
+
 /* localiza o parágrafo da seção "Observações" (pelo título, robusto ao localStorage) */
 function findObsP() {
   var secs = document.querySelectorAll('#sections .section');
@@ -738,8 +766,6 @@ function recalc() {
     if (dlSpan)  { lockCalc(dlSpan);  dlSpan.textContent  = superavit ? 'Superávit de caixa' : 'Déficit de receita para cobrir as despesas'; }
     if (dlSmall) { lockCalc(dlSmall); dlSmall.textContent = superavit ? 'sobra após cobrir tudo o que está a pagar' : 'o que falta entrar para zerar o que está a pagar'; }
     if (dv) { lockCalc(dv); dv.textContent = superavit ? '+R$ ' + fmtBR(posicao) : 'R$ ' + fmtBR(deficit); }
-    var pDefEl = document.getElementById('pDef');
-    if (pDefEl) { pDefEl.value = fmtBR(deficit); pDefEl.readOnly = true; }
 
     /* mês de referência (calendário) + data de emissão automática (hoje) */
     var now = new Date();
@@ -763,56 +789,64 @@ function recalc() {
     var restantes = bizDaysFrom(y, mo, splitDay);  /* dias úteis restantes; diminui a cada dia útil */
     var decorr    = totalDU - restantes;           /* dias úteis já concluídos */
 
-    /* ritmo diário = caixa gerado ÷ dias úteis decorridos (mín. 1 p/ não dividir por zero) */
-    var caixa = lineVal(rec, 'caixa', ['caixa gerado', 'caixa']);
-    var ritmo = caixa / Math.max(decorr, 1);
-    if (!isFinite(ritmo)) ritmo = 0;
-
-    setField('pTotal',  String(totalDU));
-    setField('pDecorr', String(decorr));
-    setField('pDias',   String(restantes));
-    setField('pRitmo',  fmtBR(ritmo));
-
-    /* warm-up: só extrapola o ritmo após dias úteis suficientes (evita ruído de início de mês) */
-    var projOk = decorr >= MIN_DIAS_PROJ && restantes > 0;
-    var enter = projOk ? restantes * ritmo : 0;  /* a entrar nos dias úteis restantes */
-    if (!isFinite(enter)) enter = 0;
-    var res = posicao + enter;                   /* fechamento projetado = posição atual + o que ainda entra */
-    if (!isFinite(res)) res = 0;
-
-    var vEnter = document.getElementById('valEnter');
-    var vDef   = document.getElementById('valDef');
-    if (vEnter) vEnter.textContent = projOk ? 'R$ ' + fmtBR(enter) : '—';
-    if (vDef)   vDef.textContent   = 'R$ ' + fmtBR(deficit);
-    var mx = Math.max(enter, deficit, 1);
-    var bEnter = document.getElementById('barEnter');
-    var bDef   = document.getElementById('barDef');
-    if (bEnter) bEnter.style.width = (enter   / mx * 100) + '%';
-    if (bDef)   bDef.style.width   = (deficit / mx * 100) + '%';
-    var el = document.getElementById('resultCalc');
-    if (el) {
-      el.textContent = (res >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(res));
-      el.className = 'rv ' + (res >= 0 ? 'pos' : 'neg');
-    }
-    var rlSmall = document.querySelector('.result .rl small');
-    if (rlSmall) {
-      lockCalc(rlSmall);
-      rlSmall.textContent = projOk
-        ? '(posição atual + a entrar nos dias restantes) · estimativa'
-        : 'aguardando ' + MIN_DIAS_PROJ + ' dias úteis para projetar o ritmo (decorridos: ' + decorr + ')';
-    }
-
-    var hv = document.querySelector('.hero .hv');
-    if (hv) { lockCalc(hv); hv.textContent = '≈ ' + (res >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(res), 0); }
-
-    /* textos automáticos: hero + subtítulos das linhas (refletem o mês/estado) */
+    /* ritmos diários: receita (caixa÷decorridos) e despesa (paga÷decorridos) */
     var monthName = new Date(y, mo, 1).toLocaleDateString('pt-BR', {month: 'long'});
+    var caixa   = lineVal(rec,  'caixa', ['caixa gerado', 'caixa']);
+    var pagaVal = lineVal(desp, 'paga',  ['paga']);
+    var ritmoRec  = caixa   / Math.max(decorr, 1);
+    var ritmoDesp = pagaVal / Math.max(decorr, 1);
+    if (!isFinite(ritmoRec))  ritmoRec  = 0;
+    if (!isFinite(ritmoDesp)) ritmoDesp = 0;
+
+    /* warm-up: só extrapola após dias úteis suficientes (evita ruído de início de mês) */
+    var projOk = decorr >= MIN_DIAS_PROJ && restantes > 0;
+
+    /* projeção do mês — despesa = ritmo + "A pagar" conhecido */
+    var receitaProj = caixa   + ritmoRec  * restantes;
+    var despesaProj = pagaVal + ritmoDesp * restantes + aPagar;
+    var resultMes   = receitaProj - despesaProj;                    /* resultado do mês (receita − despesa) */
+    var saldoProj   = posicao + (ritmoRec - ritmoDesp) * restantes; /* saldo de caixa projetado no fim do mês */
+    if (!isFinite(receitaProj)) receitaProj = 0;
+    if (!isFinite(despesaProj)) despesaProj = 0;
+    if (!isFinite(resultMes))   resultMes   = 0;
+    if (!isFinite(saldoProj))   saldoProj   = posicao;
+
+    var sig = function (v) { return (v >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(v)); };
+    var setPV = function (id, v) { var e = document.getElementById(id); if (e) e.textContent = 'R$ ' + fmtBR(v); };
+    var setRV = function (id, v) { var e = document.getElementById(id); if (e) { e.textContent = sig(v); e.className = 'rv ' + (v >= 0 ? 'pos' : 'neg'); } };
+    var setDash = function (id, isRv) { var e = document.getElementById(id); if (e) { e.textContent = '—'; e.className = isRv ? 'rv' : 'pv'; } };
+
+    ensureProjLayout();
+    setField('pTotal',     String(totalDU));
+    setField('pDecorr',    String(decorr));
+    setField('pDias',      String(restantes));
+    setField('pRitmoRec',  fmtBR(ritmoRec));
+    setField('pRitmoDesp', fmtBR(ritmoDesp));
+
+    if (projOk) {
+      setPV('receitaProj', receitaProj);
+      setPV('despesaProj', despesaProj);
+      setRV('resultMes', resultMes);
+      setRV('saldoProj', saldoProj);
+    } else {
+      setDash('receitaProj', false); setDash('despesaProj', false);
+      setDash('resultMes', true);    setDash('saldoProj', true);
+    }
+    var projNote = document.getElementById('projNote');
+    if (projNote) projNote.textContent = projOk
+      ? 'Projeção pelo ritmo diário de receita e despesa até o fim de ' + monthName + '.'
+      : 'Aguardando ' + MIN_DIAS_PROJ + ' dias úteis para projetar o ritmo (decorridos: ' + decorr + ').';
+
+    /* destaque (hero) = saldo de caixa projetado no fim do mês */
+    var heroVal = projOk ? saldoProj : posicao;
+    var hv = document.querySelector('.hero .hv');
+    if (hv) { lockCalc(hv); hv.textContent = '≈ ' + (heroVal >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(heroVal), 0); }
     var hl = document.querySelector('.hero .hl');
     if (hl) { lockCalc(hl); hl.textContent = 'Projeção de fechamento de ' + monthName; }
     var hs = document.querySelector('.hero .hs');
-    if (hs) { lockCalc(hs); hs.textContent = 'Estimativa mantendo o ritmo diário de receita até o fim do mês.'; }
+    if (hs) { lockCalc(hs); hs.textContent = 'Estimativa pelo ritmo diário de receita e despesa até o fim do mês.'; }
     var badge = document.querySelector('.hero .badge span');
-    if (badge) { lockCalc(badge); badge.textContent = res >= 0 ? 'Positiva' : 'Negativa'; }
+    if (badge) { lockCalc(badge); badge.textContent = heroVal >= 0 ? 'Positiva' : 'Negativa'; }
 
     setLineSub(findLine(rec,  'caixa',     ['caixa gerado', 'caixa']),   'entrou de fato no mês · base do ritmo diário');
     setLineSub(findLine(rec,  'receber',   ['a receber', 'receber']),    'títulos a vencer · considera −10% de inadimplência');
@@ -827,15 +861,14 @@ function recalc() {
       lockCalc(obsP);
       var diasTxt = (restantes === 1 ? 'Resta 1 dia útil' : 'Restam ' + restantes + ' dias úteis');
       var posTxt = superavit
-        ? 'a posição já é superavitária em R$ ' + fmtBR(posicao)
-        : (deficit > 0 ? 'ainda há um déficit de R$ ' + fmtBR(deficit) + ' a cobrir' : 'a posição está equilibrada');
-      var closeTxt = (res >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(res));
-      var ritmoFrase = projOk
-        ? 'Mantido o ritmo diário de R$ ' + fmtBR(ritmo) + ' até o fim do mês, o fechamento projetado é de aproximadamente ' + closeTxt + '.'
-        : 'Com ' + decorr + ' dia(s) útil(eis) decorrido(s), a projeção do ritmo (R$ ' + fmtBR(ritmo) + '/dia) fica disponível a partir de ' + MIN_DIAS_PROJ + ' dias úteis.';
-      obsP.textContent =
-        diasTxt + ' em ' + monthName + '. ' +
-        'Considerando 10% de inadimplência sobre "A receber", ' + posTxt + '. ' + ritmoFrase;
+        ? 'a posição de hoje já é superavitária em R$ ' + fmtBR(posicao)
+        : (deficit > 0 ? 'a posição de hoje tem déficit de R$ ' + fmtBR(deficit) : 'a posição de hoje está equilibrada');
+      obsP.textContent = projOk
+        ? (diasTxt + ' em ' + monthName + '. Ritmo diário: receita R$ ' + fmtBR(ritmoRec) + ', despesa R$ ' + fmtBR(ritmoDesp) + '. ' +
+           'Projeção do mês — receita ' + sig(receitaProj) + ', despesa ' + sig(despesaProj) + ', resultado ' + sig(resultMes) + '. ' +
+           'Saldo de caixa projetado no fim do mês: ' + sig(saldoProj) + '. Considerando 10% de inadimplência sobre "A receber", ' + posTxt + '.')
+        : (diasTxt + ' em ' + monthName + '. Com ' + decorr + ' dia(s) útil(eis) decorrido(s), a projeção do mês fica disponível a partir de ' + MIN_DIAS_PROJ + ' dias úteis. ' +
+           'Considerando 10% de inadimplência sobre "A receber", ' + posTxt + '.');
     }
 
     /* Monte Carlo: "Falta a cobrir" = déficit calculado; re-simula quando muda */
