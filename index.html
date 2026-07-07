@@ -400,7 +400,7 @@ body:not(.editing) .addsection{display:none}
           <div class="barrow"><span class="bl">Déficit</span><div class="bartrack"><div class="barfill def" id="barDef" style="width:48.87%"></div></div><span class="barval" id="valDef">R$ 21.885,00</span></div>
         </div>
         <div class="result">
-          <div class="rl"><span contenteditable="true">Resultado projetado pela conta</span><small contenteditable="true">(a entrar nos dias restantes − déficit) · estimativa</small></div>
+          <div class="rl"><span contenteditable="true">Resultado projetado pela conta</span><small contenteditable="true">(posição atual + a entrar nos dias restantes) · estimativa</small></div>
           <div class="rv pos" id="resultCalc">+R$ 22.901,00</div>
         </div>
         <button class="recbtn ctrl" onclick="recalc()">&#8635; Atualizar projeção</button>
@@ -721,7 +721,7 @@ function recalc() {
     setField('pRitmo',  fmtBR(ritmo));
 
     var enter = restantes * ritmo;  /* a entrar nos dias úteis restantes (ritmo × restantes) */
-    var res   = enter - deficit;    /* resultado projetado: cobre o déficit? */
+    var res   = posicao + enter;    /* fechamento projetado = posição atual + o que ainda entra */
 
     var vEnter = document.getElementById('valEnter');
     var vDef   = document.getElementById('valDef');
