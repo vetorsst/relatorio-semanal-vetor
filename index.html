@@ -15,7 +15,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;
-  -webkit-font-smoothing:antialiased}
+  -webkit-font-smoothing:antialiased;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 
 /* ---------- Tela de Login ---------- */
 #login-screen{
@@ -288,9 +288,13 @@ body:not(.editing) .addsection{display:none}
   .login-box{padding:32px 24px}
 }
 @media print{
-  body{background:#fff;padding:0}
+  *,*::before,*::after{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  body{background:#fff;padding:0;margin:0}
+  body.app{padding:0}
   .toolbar,.ctrl,.addline,.addsection,.recbtn,.period-picker{display:none!important}
-  .page{box-shadow:none;border-radius:0;max-width:100%}
+  .page{box-shadow:none;border-radius:0;max-width:100%;margin:0}
+  .section,.fincard,.mc-var-card,.mc-stat,.mc-compare{break-inside:avoid;page-break-inside:avoid}
+  @page{margin:12mm}
 }
 </style>
 </head>
