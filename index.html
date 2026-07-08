@@ -631,6 +631,7 @@ function fmtBR(n, dec) {
 
 /* ===== POSIÇÃO E PROJEÇÃO ===== */
 var INAD = 0.10;          /* inadimplência fixa aplicada sobre a receita projetada */
+var PROJ = null;          /* dados da projeção compartilhados com o Monte Carlo */
 
 /* localiza uma linha pelo data-role (com fallback por nome do rótulo) */
 function findLine(card, role, keywords) {
@@ -668,8 +669,8 @@ function setLineSub(ln, text) {
 /* reconstrói o layout da seção Projeção (migra automaticamente dados antigos do localStorage) */
 function ensureProjLayout() {
   var proj = document.querySelector('.proj');
-  if (!proj || proj.getAttribute('data-layout') === '3') return;
-  proj.setAttribute('data-layout', '3');
+  if (!proj || proj.getAttribute('data-layout') === '4') return;
+  proj.setAttribute('data-layout', '4');
   proj.innerHTML =
     '<div class="drivers">' +
       '<div class="driver"><label>Dias úteis do mês</label><input id="pTotal" readonly></div>' +
@@ -681,10 +682,65 @@ function ensureProjLayout() {
       '<div class="projrow"><span class="pk">Receita projetada do mês</span><span class="pv" id="receitaProj">—</span></div>' +
       '<div class="projrow"><span class="pk">Despesa do mês (fixa)</span><span class="pv" id="despesaProj">—</span></div>' +
     '</div>' +
-    '<div class="result"><div class="rl"><span>Resultado do mês</span><small>receita projetada − despesa</small></div><div class="rv" id="resultMes">—</div></div>' +
-    '<div class="result"><div class="rl"><span>Saldo final projetado</span><small>Saldo em conta + resultado do mês</small></div><div class="rv" id="saldoProj">—</div></div>' +
+    '<div class="result"><div class="rl"><span>Resultado do mês</span><small>receita projetada − despesa fixa</small></div><div class="rv" id="resultMes">—</div></div>' +
     '<div class="projnote" id="projNote"></div>' +
     '<button class="recbtn ctrl" onclick="recalc()">&#8635; Atualizar projeção</button>';
+}
+
+/* reconstrói o Monte Carlo (cenários de ritmo diário → resultado do mês) */
+function ensureMCLayout() {
+  var box = document.querySelector('.mc-box');
+  if (!box || box.getAttribute('data-layout') === '2') return;
+  box.setAttribute('data-layout', '2');
+  var sec = box.closest && box.closest('.section');
+  if (sec) { var h = sec.querySelector('h2'); if (h) h.textContent = 'Monte Carlo — Cenários de ritmo diário'; }
+  box.innerHTML =
+    '<div class="mc-vars">' +
+      '<div class="mc-var-card"><h4>Ritmo diário de receita (R$/dia)</h4>' +
+        '<div class="mc-field"><label data-tip="Pior cenário de ritmo diário">Pessimista (mín)</label><input type="number" id="mcRPess"></div>' +
+        '<div class="mc-field"><label data-tip="Ritmo diário mais provável">Médio (moda)</label><input type="number" id="mcRMed"></div>' +
+        '<div class="mc-field"><label data-tip="Melhor cenário: ritmo atual +30%">Otimista (máx · +30%)</label><input type="number" id="mcROtim" readonly></div>' +
+      '</div>' +
+      '<div class="mc-var-card"><h4>Configuração</h4>' +
+        '<div class="mc-field"><label>Distribuição</label><select id="mcDist"><option value="tri">Triangular</option><option value="uni">Uniforme</option></select></div>' +
+        '<div class="mc-field"><label>Nº de simulações</label><input type="number" id="mcN" value="10000"></div>' +
+      '</div>' +
+      '<div class="mc-var-card" style="display:flex;flex-direction:column;gap:8px;justify-content:center">' +
+        '<button class="mc-runbtn" onclick="runMC()">&#9654; Rodar simulação</button>' +
+        '<button class="mc-savebtn" id="btnSaveBase" onclick="saveScenario(\'base\')">&#128190; Salvar como Base</button>' +
+        '<button class="mc-savebtn" id="btnSavePess" onclick="saveScenario(\'pess\')">&#128190; Salvar como Pessimista</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="mc-prob-row"><span class="mpl">Probabilidade de fechar o mês positivo (Resultado &#8805; 0)</span><span class="mpv" id="mcProb">&#8212;</span></div>' +
+    '<div class="mc-stat-grid">' +
+      '<div class="mc-stat"><div class="msl">Média</div><div class="msv" id="mcMean">&#8212;</div></div>' +
+      '<div class="mc-stat"><div class="msl">P10 — Pessimista</div><div class="msv neg" id="mcP10">&#8212;</div></div>' +
+      '<div class="mc-stat"><div class="msl">P50 — Mediana</div><div class="msv" id="mcP50">&#8212;</div></div>' +
+      '<div class="mc-stat"><div class="msl">P90 — Otimista</div><div class="msv pos" id="mcP90">&#8212;</div></div>' +
+      '<div class="mc-stat"><div class="msl">Mínimo</div><div class="msv" id="mcMin">&#8212;</div></div>' +
+      '<div class="mc-stat"><div class="msl">Máximo</div><div class="msv" id="mcMax">&#8212;</div></div>' +
+    '</div>' +
+    '<div class="mc-svg-wrap"><svg id="mcSvg" viewBox="0 0 600 160" preserveAspectRatio="none"></svg></div>' +
+    '<div class="mc-legend">' +
+      '<span><span class="dot" style="background:var(--yellow);height:10px;border-radius:3px"></span>Dentro P10–P90</span>' +
+      '<span><span class="dot" style="background:#f1e3ad;height:10px;border-radius:3px"></span>Cauda</span>' +
+      '<span><span class="dot" style="background:var(--red)"></span>Equilíbrio (0)</span>' +
+      '<span><span class="dot" style="background:var(--navy);opacity:.5"></span>P10 / P90</span>' +
+      '<span><span class="dot" style="background:var(--navy)"></span>P50</span>' +
+    '</div>' +
+    '<div class="mc-compare-hint" id="mcCompareHint">Rode a simulação e clique <strong>Salvar como Base</strong> ou <strong>Salvar como Pessimista</strong> para comparar os cenários.</div>' +
+    '<div class="mc-compare" id="mcCompare" style="display:none">' +
+      '<h4>Comparação: Base × Pessimista (resultado do mês)</h4>' +
+      '<div class="mc-svg-wrap" style="margin-bottom:10px"><svg id="mcSvgCmp" viewBox="0 0 600 120" preserveAspectRatio="none"></svg></div>' +
+      '<div class="mc-compare-grid">' +
+        '<div class="mc-compare-col"><h5>Cenário Base</h5>' +
+          '<div class="mc-compare-stat"><span class="ck">P50</span><span class="cv" id="cmpBaseP50">&#8212;</span></div>' +
+          '<div class="mc-compare-stat"><span class="ck">P(positivo)</span><span class="cv" id="cmpBaseProb">&#8212;</span></div></div>' +
+        '<div class="mc-compare-col"><h5>Cenário Pessimista</h5>' +
+          '<div class="mc-compare-stat"><span class="ck">P50</span><span class="cv" id="cmpPessP50">&#8212;</span></div>' +
+          '<div class="mc-compare-stat"><span class="ck">P(positivo)</span><span class="cv" id="cmpPessProb">&#8212;</span></div></div>' +
+      '</div>' +
+    '</div>';
 }
 
 /* localiza o parágrafo da seção "Observações" (pelo título, robusto ao localStorage) */
@@ -740,7 +796,7 @@ function refYM() {
   return { y: now.getFullYear(), m: now.getMonth() };
 }
 
-var mcFaltaCache = null; /* evita re-rodar o Monte Carlo se a falta não mudou */
+var mcSigCache = null; /* evita re-rodar o Monte Carlo se a projeção não mudou */
 
 function recalc() {
   try {
@@ -795,18 +851,19 @@ function recalc() {
     var ritmoRec = caixa / Math.max(decorr, 1);
     if (!isFinite(ritmoRec)) ritmoRec = 0;
 
-    /* RECEITA = Caixa gerado + (ritmo × dias restantes) + A receber + Atrasados, com −10% sobre o total.
-       Ritmo considerado desde o início. DESPESA = fixa = Paga + A pagar (sem ritmo). */
+    /* RECEITA = Saldo em conta + Caixa gerado + (ritmo × dias restantes) + A receber + Atrasados, com −10%.
+       Ritmo desde o início. DESPESA = fixa = Paga + A pagar (sem ritmo). */
+    var receitaFn = function (r) { return (saldo + caixa + r * restantes + receber + atrasados) * (1 - INAD); };
     var ritmoContrib = ritmoRec * restantes;
-    var receitaBruta = caixa + ritmoContrib + receber + atrasados;
-    var receitaProj  = receitaBruta * (1 - INAD);
+    var receitaProj  = receitaFn(ritmoRec);
     var despesaProj  = pagaVal + aPagar;
     var resultMes    = receitaProj - despesaProj;   /* resultado do mês */
-    var saldoFinal   = saldo + resultMes;           /* saldo final projetado */
     if (!isFinite(receitaProj)) receitaProj = 0;
     if (!isFinite(despesaProj)) despesaProj = 0;
     if (!isFinite(resultMes))   resultMes   = 0;
-    if (!isFinite(saldoFinal))  saldoFinal  = saldo;
+
+    /* dados p/ o Monte Carlo (varia o ritmo diário) */
+    PROJ = { ritmo: ritmoRec, restantes: restantes, despesa: despesaProj, receitaFn: receitaFn };
 
     var sig = function (v) { return (v >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(v)); };
     var setPV = function (id, v) { var e = document.getElementById(id); if (e) e.textContent = 'R$ ' + fmtBR(v); };
@@ -821,13 +878,12 @@ function recalc() {
     setPV('receitaProj', receitaProj);
     setPV('despesaProj', despesaProj);
     setRV('resultMes', resultMes);
-    setRV('saldoProj', saldoFinal);
     var projNote = document.getElementById('projNote');
     if (projNote) projNote.textContent =
-      'Receita: Caixa gerado + ritmo diário × dias restantes + A receber + Atrasados, com −10% de inadimplência sobre o total. Despesa fixa = Paga + A pagar.';
+      'Receita: Saldo em conta + Caixa gerado + ritmo diário × dias restantes + A receber + Atrasados, com −10% de inadimplência sobre o total. Despesa fixa = Paga + A pagar.';
 
-    /* destaque (hero) = saldo final projetado */
-    var heroVal = saldoFinal;
+    /* destaque (hero) = resultado do mês */
+    var heroVal = resultMes;
     var hv = document.querySelector('.hero .hv');
     if (hv) { lockCalc(hv); hv.textContent = '≈ ' + (heroVal >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(heroVal), 0); }
     var hl = document.querySelector('.hero .hl');
@@ -840,7 +896,7 @@ function recalc() {
     setLineSub(findLine(rec,  'caixa',     ['caixa gerado', 'caixa']),   'entrou de fato no mês · base do ritmo diário');
     setLineSub(findLine(rec,  'receber',   ['a receber', 'receber']),    'títulos a vencer · considera −10% de inadimplência');
     setLineSub(findLine(rec,  'atrasados', ['atrasado']),                'títulos vencidos e ainda não pagos');
-    setLineSub(findLine(rec,  'saldo',     ['saldo em conta', 'saldo']), 'posição atual em conta');
+    setLineSub(findLine(rec,  'saldo',     ['saldo em conta', 'saldo']), 'saldo atual em conta · compõe a receita');
     setLineSub(findLine(desp, 'apagar',    ['a pagar']),                 'compromissos em aberto no mês');
     setLineSub(findLine(desp, 'paga',      ['paga']),                    'já liquidada no mês');
 
@@ -855,16 +911,13 @@ function recalc() {
       obsP.textContent =
         diasTxt + ' em ' + monthName + '. Ritmo diário de receita R$ ' + fmtBR(ritmoRec) + '. ' +
         'Projeção do mês — receita R$ ' + fmtBR(receitaProj) + ' (já com −10% de inadimplência), despesa fixa R$ ' + fmtBR(despesaProj) + ' (Paga + A pagar), resultado ' + sig(resultMes) + '. ' +
-        'Saldo final projetado: ' + sig(saldoFinal) + '. Posição de hoje: ' + posTxt + '.';
+        'Posição de hoje: ' + posTxt + '.';
     }
 
     /* Monte Carlo: "Falta a cobrir" = déficit calculado; re-simula quando muda */
-    var mcFaltaEl = document.getElementById('mcFalta');
-    if (mcFaltaEl) {
-      mcFaltaEl.value = Math.round(deficit);
-      mcFaltaEl.readOnly = true;
-      if (deficit !== mcFaltaCache && typeof runMC === 'function') { mcFaltaCache = deficit; runMC(); }
-    }
+    /* Monte Carlo re-roda quando a projeção muda (ritmo, dias, despesa, recebíveis, saldo) */
+    var mcSig = [ritmoRec, restantes, despesaProj, saldo, caixa, receber, atrasados].join('|');
+    if (mcSig !== mcSigCache && typeof runMC === 'function') { mcSigCache = mcSig; runMC(); }
   } catch (e) {}
 }
 /* ===== LINHAS ===== */
@@ -967,7 +1020,7 @@ function mcFmtK(v) {
   return (v / 1000).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0}) + 'k';
 }
 function mcPct(v) { return v.toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%'; }
-function getN(id) { var v = parseFloat(document.getElementById(id).value); return (isNaN(v) || v < 0) ? 0 : v; }
+function getN(id) { var el = document.getElementById(id); var v = el ? parseFloat(el.value) : 0; return (isNaN(v) || v < 0) ? 0 : v; }
 
 /* -- troca de distribuição -- */
 function onDistChange(pfx) {
@@ -983,15 +1036,14 @@ function onDistChange(pfx) {
 
 /* -- simulação -- */
 function simulate(n) {
-  var exDist = document.getElementById('exDist').value;
-  var rdDist = document.getElementById('rdDist').value;
-  var vnDist = document.getElementById('vnDist').value;
+  if (!PROJ || typeof PROJ.receitaFn !== 'function') return [];
+  var de = document.getElementById('mcDist');
+  var dist = de ? de.value : 'tri';
+  var mn = getN('mcRPess'), md = getN('mcRMed'), mx = getN('mcROtim');
   var res = new Array(n);
   for (var i = 0; i < n; i++) {
-    var ex = sample(exDist, getN('exMin'), getN('exMode'), getN('exMax'));
-    var rd = sample(rdDist, getN('rdMin'), getN('rdMode'), getN('rdMax'));
-    var vn = sample(vnDist, getN('vnMin'), getN('vnMode'), getN('vnMax'));
-    res[i] = ex + rd + vn;
+    var r = dist === 'uni' ? sampleUni(mn, mx) : sampleTri(mn, md, mx);
+    res[i] = PROJ.receitaFn(r) - PROJ.despesa;   /* resultado do mês nesse ritmo */
   }
   res.sort(function(a, b) { return a - b; });
   return res;
@@ -1045,7 +1097,7 @@ function drawHisto(svgId, results, falta, st, alpha, bins) {
     var xf = xOf(falta);
     lines += '<line x1="' + xf + '" y1="0" x2="' + xf + '" y2="' + (H - 22) +
       '" stroke="#d2433a" stroke-width="2"/>' +
-      '<text x="' + (parseFloat(xf) + 3) + '" y="12" font-size="9" fill="#d2433a" font-weight="700">Falta</text>';
+      '<text x="' + (parseFloat(xf) + 3) + '" y="12" font-size="9" fill="#d2433a" font-weight="700">0</text>';
   }
   [[st.p10, '0 6 6 0', 0.5], [st.p90, '0 6 6 0', 0.5]].forEach(function(item) {
     var xp = xOf(item[0]);
@@ -1073,15 +1125,15 @@ function drawHisto(svgId, results, falta, st, alpha, bins) {
 }
 
 /* -- atualizar UI -- */
-function updateUI(st, falta) {
-  document.getElementById('mcFaltaLbl').textContent = falta.toLocaleString('pt-BR');
-  document.getElementById('mcProb').textContent  = mcPct(st.prob);
-  document.getElementById('mcMean').textContent  = mcFmt(st.mean);
-  document.getElementById('mcP10').textContent   = mcFmt(st.p10);
-  document.getElementById('mcP50').textContent   = mcFmt(st.p50);
-  document.getElementById('mcP90').textContent   = mcFmt(st.p90);
-  document.getElementById('mcMin').textContent   = mcFmt(st.min);
-  document.getElementById('mcMax').textContent   = mcFmt(st.max);
+function updateUI(st) {
+  var set = function (id, txt) { var e = document.getElementById(id); if (e) e.textContent = txt; };
+  set('mcProb', mcPct(st.prob));
+  set('mcMean', mcFmt(st.mean));
+  set('mcP10',  mcFmt(st.p10));
+  set('mcP50',  mcFmt(st.p50));
+  set('mcP90',  mcFmt(st.p90));
+  set('mcMin',  mcFmt(st.min));
+  set('mcMax',  mcFmt(st.max));
 }
 
 var mcLastBase = null;
@@ -1089,14 +1141,25 @@ var mcLastPess = null;
 var mcLastRun  = null;
 
 function runMC() {
-  var n     = Math.min(Math.max(parseInt(document.getElementById('mcN').value) || 10000, 100), 50000);
-  var falta = getN('mcFalta');
+  if (!PROJ) return;
+  ensureMCLayout();
+  /* otimista automático = ritmo atual +30%; defaults do pessimista/médio se vazios */
+  var r0 = PROJ.ritmo || 0;
+  var otim = document.getElementById('mcROtim');
+  if (otim) { otim.value = Math.round(r0 * 1.30); otim.readOnly = true; }  /* +30% do ritmo atual */
+  var pEl = document.getElementById('mcRPess'), mEl = document.getElementById('mcRMed');
+  if (pEl && pEl.value.trim() === '') pEl.value = Math.round(r0 * 0.40);
+  if (mEl && mEl.value.trim() === '') mEl.value = Math.round(r0 * 0.70);
 
+  var nEl = document.getElementById('mcN');
+  var n = Math.min(Math.max(parseInt(nEl ? nEl.value : 10000) || 10000, 100), 50000);
   var res = simulate(n);
-  var st  = calcStats(res, falta);
+  if (!res.length) return;
+  var st = calcStats(res, 0);   /* alvo = 0 (equilíbrio) */
   mcLastRun = {res: res, st: st};
-  updateUI(st, falta);
-  drawHisto('mcSvg', res, falta, st, 1);
+  updateUI(st);
+  drawHisto('mcSvg', res, 0, st, 1);
+  showCompare();
 }
 
 /* serializa cenários salvos para persistência (res arredondado p/ limitar tamanho) */
@@ -1111,7 +1174,6 @@ function serializeScenarios() {
 
 function saveScenario(type) {
   if (!mcLastRun) return;
-  var falta = getN('mcFalta');
   if (type === 'base') {
     mcLastBase = mcLastRun;
     var btn = document.getElementById('btnSaveBase');
@@ -1125,15 +1187,7 @@ function saveScenario(type) {
     btn.textContent = '✓ Pessimista salvo';
     setTimeout(function() { btn.classList.remove('saved'); btn.textContent = '💾 Salvar como Pessimista'; }, 2000);
   }
-  if (mcLastBase && mcLastPess) {
-    document.getElementById('mcCompareHint').style.display = 'none';
-    document.getElementById('mcCompare').style.display = '';
-    document.getElementById('cmpBaseP50').textContent  = mcFmt(mcLastBase.st.p50);
-    document.getElementById('cmpBaseProb').textContent = mcPct(mcLastBase.st.prob);
-    document.getElementById('cmpPessP50').textContent  = mcFmt(mcLastPess.st.p50);
-    document.getElementById('cmpPessProb').textContent = mcPct(mcLastPess.st.prob);
-    drawCompareSvg(falta);
-  }
+  showCompare();
   scheduleSave();
 }
 
@@ -1188,11 +1242,13 @@ function drawCompareSvg(falta) {
 /* ===== EVENTOS E PERSISTÊNCIA ===== */
 
 function bindEvents() {
-  var mcIds = ['exMin','exMode','exMax','rdMin','rdMode','rdMax','vnMin','vnMode','vnMax','mcN'];
-  mcIds.forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) el.addEventListener('change', runMC);
-  });
+  // Inputs do Monte Carlo (criados dinamicamente) via delegação de eventos.
+  document.addEventListener('change', function (e) {
+    var id = e.target && e.target.id;
+    if (id === 'mcRPess' || id === 'mcRMed' || id === 'mcN' || id === 'mcDist') {
+      if (typeof runMC === 'function') runMC();
+    }
+  }, true);
   // Em qualquer edição: recalcula posição/projeção e agenda salvamento.
   ['input', 'change', 'focusout'].forEach(function(ev) {
     document.addEventListener(ev, recalc, true);
@@ -1261,16 +1317,20 @@ function restoreScenarios(mc) {
   if (!mc) return;
   mcLastBase = mc.base || null;
   mcLastPess = mc.pess || null;
-  if (mcLastBase && mcLastPess) {
-    var falta = getN('mcFalta');
-    document.getElementById('mcCompareHint').style.display = 'none';
-    document.getElementById('mcCompare').style.display = '';
-    document.getElementById('cmpBaseP50').textContent  = mcFmt(mcLastBase.st.p50);
-    document.getElementById('cmpBaseProb').textContent = mcPct(mcLastBase.st.prob);
-    document.getElementById('cmpPessP50').textContent  = mcFmt(mcLastPess.st.p50);
-    document.getElementById('cmpPessProb').textContent = mcPct(mcLastPess.st.prob);
-    drawCompareSvg(falta);
-  }
+  showCompare();
+}
+
+/* mostra o quadro de comparação Base × Pessimista (robusto à reconstrução do layout) */
+function showCompare() {
+  if (!mcLastBase || !mcLastPess) return;
+  var set = function (id, t) { var e = document.getElementById(id); if (e) e.textContent = t; };
+  var hint = document.getElementById('mcCompareHint'); if (hint) hint.style.display = 'none';
+  var cmp = document.getElementById('mcCompare'); if (cmp) cmp.style.display = '';
+  set('cmpBaseP50',  mcFmt(mcLastBase.st.p50));
+  set('cmpBaseProb', mcPct(mcLastBase.st.prob));
+  set('cmpPessP50',  mcFmt(mcLastPess.st.p50));
+  set('cmpPessProb', mcPct(mcLastPess.st.prob));
+  drawCompareSvg(0);
 }
 </script>
 
