@@ -649,7 +649,7 @@ function fmtBR(n, dec) {
 
 /* ===== POSIÇÃO E PROJEÇÃO ===== */
 var INAD = 0.15;          /* inadimplência fixa aplicada sobre a receita projetada */
-var PROJ_FATOR = 0.70;    /* fator conservador: projeta 30% a menos de receita pelo ritmo atual */
+var PROJ_FATOR = 0.75;    /* fator conservador: projeta 25% a menos de receita pelo ritmo atual */
 
 /* localiza uma linha pelo data-role (com fallback por nome do rótulo) */
 function findLine(card, role, keywords) {
@@ -825,9 +825,9 @@ function recalc() {
     var ritmoRec = caixa / Math.max(decorr, 1);
     if (!isFinite(ritmoRec)) ritmoRec = 0;
 
-    /* RECEITA = Caixa gerado + (ritmo × 0,70 × dias restantes) + A receber + Atrasados, com −15% de inadimplência.
-       Saldo em conta NÃO entra (= Caixa − Paga, já representado). DESPESA = fixa = Paga + A pagar. */
-    var receitaProj = (caixa + ritmoRec * PROJ_FATOR * restantes + receber + atrasados) * (1 - INAD);
+    /* RECEITA = Caixa gerado + (ritmo × 0,75 × dias restantes) + A receber (−15% inadimplência) + Atrasados.
+       Inadimplência só sobre "A receber". Saldo NÃO entra (= Caixa − Paga). DESPESA = fixa = Paga + A pagar. */
+    var receitaProj = caixa + ritmoRec * PROJ_FATOR * restantes + receber * (1 - INAD) + atrasados;
     var despesaProj = pagaVal + aPagar;
     var resultMes   = receitaProj - despesaProj;   /* resultado do mês */
     if (!isFinite(receitaProj)) receitaProj = 0;
@@ -849,7 +849,7 @@ function recalc() {
     setRV('resultMes', resultMes);
     var projNote = document.getElementById('projNote');
     if (projNote) projNote.textContent =
-      'Receita: Caixa gerado + ritmo diário × 0,70 (30% conservador) × dias restantes + A receber + Atrasados, com −15% de inadimplência. Despesa fixa = Paga + A pagar. Saldo em conta = Caixa − Paga (automático, fora da soma).';
+      'Receita: Caixa gerado + ritmo diário × 0,75 (25% conservador) × dias restantes + A receber (−15% inadimplência) + Atrasados. Despesa fixa = Paga + A pagar. Saldo em conta = Caixa − Paga (automático, fora da soma).';
 
     /* destaque (hero) = resultado do mês */
     var heroVal = resultMes;
@@ -858,7 +858,7 @@ function recalc() {
     var hl = document.querySelector('.hero .hl');
     if (hl) { lockCalc(hl); hl.textContent = 'Projeção de fechamento de ' + monthName; }
     var hs = document.querySelector('.hero .hs');
-    if (hs) { lockCalc(hs); hs.textContent = 'Receita projetada pelo ritmo diário (30% conservador, −15% inadimplência) menos despesa fixa (Paga + A pagar).'; }
+    if (hs) { lockCalc(hs); hs.textContent = 'Receita projetada pelo ritmo diário (25% conservador) e recebíveis (−15% inadimplência em A receber) menos despesa fixa (Paga + A pagar).'; }
     var badge = document.querySelector('.hero .badge span');
     if (badge) { lockCalc(badge); badge.textContent = resultMes >= 0 ? 'Positiva' : 'Negativa'; }
 
@@ -879,7 +879,7 @@ function recalc() {
         : (deficit > 0 ? 'a posição de hoje tem déficit de R$ ' + fmtBR(deficit) : 'a posição de hoje está equilibrada');
       obsP.textContent =
         diasTxt + ' em ' + monthName + '. Ritmo diário de receita R$ ' + fmtBR(ritmoRec) + '. ' +
-        'Projeção do mês — receita R$ ' + fmtBR(receitaProj) + ' (ritmo 30% conservador, −15% inadimplência), despesa fixa R$ ' + fmtBR(despesaProj) + ' (Paga + A pagar), resultado ' + sig(resultMes) + '. ' +
+        'Projeção do mês — receita R$ ' + fmtBR(receitaProj) + ' (ritmo 25% conservador, −15% inadimplência em A receber), despesa fixa R$ ' + fmtBR(despesaProj) + ' (Paga + A pagar), resultado ' + sig(resultMes) + '. ' +
         'Posição de hoje: ' + posTxt + '.';
     }
 
