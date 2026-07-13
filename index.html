@@ -772,10 +772,16 @@ function recalc() {
   try {
     var rec  = document.querySelector('.fincard.rec');
     var desp = document.querySelector('.fincard.desp');
-    var saldo     = lineVal(rec,  'saldo',     ['saldo em conta', 'saldo']);
+    var caixa     = lineVal(rec,  'caixa',     ['caixa gerado', 'caixa']);
+    var pagaVal   = lineVal(desp, 'paga',      ['paga']);
     var receber   = lineVal(rec,  'receber',   ['a receber', 'receber']);
     var atrasados = lineVal(rec,  'atrasados', ['atrasado']);
     var aPagar    = lineVal(desp, 'apagar',    ['a pagar']);
+
+    /* Saldo em conta = Caixa gerado − Despesa paga (automático; NÃO entra na soma da receita) */
+    var saldo = caixa - pagaVal;
+    var saldoLn = findLine(rec, 'saldo', ['saldo em conta', 'saldo']);
+    if (saldoLn) { var sv = saldoLn.querySelector('.val'); if (sv) { lockCalc(sv); sv.textContent = 'R$ ' + fmtBR(saldo); } }
 
     /* posição = saldo + a receber (−20%) + atrasados − a pagar */
     var posicao = saldo + receber * (1 - INAD) + atrasados - aPagar;
@@ -816,14 +822,12 @@ function recalc() {
 
     /* ritmo diário — apenas de receita (caixa ÷ dias decorridos) */
     var monthName = new Date(y, mo, 1).toLocaleDateString('pt-BR', {month: 'long'});
-    var caixa   = lineVal(rec,  'caixa', ['caixa gerado', 'caixa']);
-    var pagaVal = lineVal(desp, 'paga',  ['paga']);
     var ritmoRec = caixa / Math.max(decorr, 1);
     if (!isFinite(ritmoRec)) ritmoRec = 0;
 
-    /* RECEITA = Saldo + Caixa + (ritmo × 0,70 × dias restantes) + A receber + Atrasados, com −20% de inadimplência.
-       Ritmo desde o início, projetado 30% mais conservador. DESPESA = fixa = Paga + A pagar (sem ritmo). */
-    var receitaProj = (saldo + caixa + ritmoRec * PROJ_FATOR * restantes + receber + atrasados) * (1 - INAD);
+    /* RECEITA = Caixa gerado + (ritmo × 0,70 × dias restantes) + A receber + Atrasados, com −20% de inadimplência.
+       Saldo em conta NÃO entra (= Caixa − Paga, já representado). DESPESA = fixa = Paga + A pagar. */
+    var receitaProj = (caixa + ritmoRec * PROJ_FATOR * restantes + receber + atrasados) * (1 - INAD);
     var despesaProj = pagaVal + aPagar;
     var resultMes   = receitaProj - despesaProj;   /* resultado do mês */
     if (!isFinite(receitaProj)) receitaProj = 0;
@@ -845,7 +849,7 @@ function recalc() {
     setRV('resultMes', resultMes);
     var projNote = document.getElementById('projNote');
     if (projNote) projNote.textContent =
-      'Receita: Saldo + Caixa + ritmo diário × 0,70 (30% conservador) × dias restantes + A receber + Atrasados, com −20% de inadimplência sobre o total. Despesa fixa = Paga + A pagar.';
+      'Receita: Caixa gerado + ritmo diário × 0,70 (30% conservador) × dias restantes + A receber + Atrasados, com −20% de inadimplência. Despesa fixa = Paga + A pagar. Saldo em conta = Caixa − Paga (automático, fora da soma).';
 
     /* destaque (hero) = resultado do mês */
     var heroVal = resultMes;
@@ -861,7 +865,7 @@ function recalc() {
     setLineSub(findLine(rec,  'caixa',     ['caixa gerado', 'caixa']),   'entrou de fato no mês · base do ritmo diário');
     setLineSub(findLine(rec,  'receber',   ['a receber', 'receber']),    'títulos a vencer · considera −20% de inadimplência');
     setLineSub(findLine(rec,  'atrasados', ['atrasado']),                'títulos vencidos e ainda não pagos');
-    setLineSub(findLine(rec,  'saldo',     ['saldo em conta', 'saldo']), 'saldo atual em conta · compõe a receita');
+    setLineSub(findLine(rec,  'saldo',     ['saldo em conta', 'saldo']), 'automático: Caixa gerado − Despesa paga');
     setLineSub(findLine(desp, 'apagar',    ['a pagar']),                 'compromissos em aberto no mês');
     setLineSub(findLine(desp, 'paga',      ['paga']),                    'já liquidada no mês');
 
