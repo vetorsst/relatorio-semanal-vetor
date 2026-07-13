@@ -359,7 +359,7 @@ body:not(.editing) .addsection{display:none}
           <div class="ch"><span contenteditable="true">Receita</span></div>
           <div class="linelist">
             <div class="line" data-role="caixa"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Caixa gerado</span><span class="sub" contenteditable="true">entrou de fato no mês · base do ritmo diário</span></div><div class="val" contenteditable="true">R$ 89.566,43</div></div>
-            <div class="line" data-role="receber"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">A receber</span><span class="sub" contenteditable="true">títulos em aberto a vencer · considera −10% inadimplência</span></div><div class="val" contenteditable="true">R$ 36.882,76</div></div>
+            <div class="line" data-role="receber"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">A receber</span><span class="sub" contenteditable="true">títulos em aberto a vencer · considera −20% inadimplência</span></div><div class="val" contenteditable="true">R$ 36.882,76</div></div>
             <div class="line" data-role="atrasados"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Atrasados</span><span class="sub" contenteditable="true">inadimplência da semana</span></div><div class="val" contenteditable="true">R$ 4.640,00</div></div>
             <div class="line" data-role="saldo"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Saldo em conta</span><span class="sub" contenteditable="true">posição atual</span></div><div class="val" contenteditable="true">R$ 25.043,84</div></div>
           </div>
@@ -648,7 +648,8 @@ function fmtBR(n, dec) {
 }
 
 /* ===== POSIÇÃO E PROJEÇÃO ===== */
-var INAD = 0.10;          /* inadimplência fixa aplicada sobre a receita projetada */
+var INAD = 0.20;          /* inadimplência fixa aplicada sobre a receita projetada */
+var PROJ_FATOR = 0.70;    /* fator conservador: projeta 30% a menos de receita pelo ritmo atual */
 
 /* localiza uma linha pelo data-role (com fallback por nome do rótulo) */
 function findLine(card, role, keywords) {
@@ -776,7 +777,7 @@ function recalc() {
     var atrasados = lineVal(rec,  'atrasados', ['atrasado']);
     var aPagar    = lineVal(desp, 'apagar',    ['a pagar']);
 
-    /* posição = saldo + a receber (−10%) + atrasados − a pagar */
+    /* posição = saldo + a receber (−20%) + atrasados − a pagar */
     var posicao = saldo + receber * (1 - INAD) + atrasados - aPagar;
     if (!isFinite(posicao)) posicao = 0;
     var deficit = posicao < 0 ? -posicao : 0; /* receita nova p/ cobrir o "a pagar" */
@@ -820,9 +821,9 @@ function recalc() {
     var ritmoRec = caixa / Math.max(decorr, 1);
     if (!isFinite(ritmoRec)) ritmoRec = 0;
 
-    /* RECEITA = Saldo em conta + Caixa gerado + (ritmo × dias restantes) + A receber + Atrasados, com −10%.
-       Ritmo desde o início. DESPESA = fixa = Paga + A pagar (sem ritmo). */
-    var receitaProj = (saldo + caixa + ritmoRec * restantes + receber + atrasados) * (1 - INAD);
+    /* RECEITA = Saldo + Caixa + (ritmo × 0,70 × dias restantes) + A receber + Atrasados, com −20% de inadimplência.
+       Ritmo desde o início, projetado 30% mais conservador. DESPESA = fixa = Paga + A pagar (sem ritmo). */
+    var receitaProj = (saldo + caixa + ritmoRec * PROJ_FATOR * restantes + receber + atrasados) * (1 - INAD);
     var despesaProj = pagaVal + aPagar;
     var resultMes   = receitaProj - despesaProj;   /* resultado do mês */
     if (!isFinite(receitaProj)) receitaProj = 0;
@@ -844,7 +845,7 @@ function recalc() {
     setRV('resultMes', resultMes);
     var projNote = document.getElementById('projNote');
     if (projNote) projNote.textContent =
-      'Receita: Saldo em conta + Caixa gerado + ritmo diário × dias restantes + A receber + Atrasados, com −10% de inadimplência sobre o total. Despesa fixa = Paga + A pagar.';
+      'Receita: Saldo + Caixa + ritmo diário × 0,70 (30% conservador) × dias restantes + A receber + Atrasados, com −20% de inadimplência sobre o total. Despesa fixa = Paga + A pagar.';
 
     /* destaque (hero) = resultado do mês */
     var heroVal = resultMes;
@@ -853,12 +854,12 @@ function recalc() {
     var hl = document.querySelector('.hero .hl');
     if (hl) { lockCalc(hl); hl.textContent = 'Projeção de fechamento de ' + monthName; }
     var hs = document.querySelector('.hero .hs');
-    if (hs) { lockCalc(hs); hs.textContent = 'Receita projetada pelo ritmo diário (−10% inadimplência) menos despesa fixa (Paga + A pagar).'; }
+    if (hs) { lockCalc(hs); hs.textContent = 'Receita projetada pelo ritmo diário (30% conservador, −20% inadimplência) menos despesa fixa (Paga + A pagar).'; }
     var badge = document.querySelector('.hero .badge span');
     if (badge) { lockCalc(badge); badge.textContent = resultMes >= 0 ? 'Positiva' : 'Negativa'; }
 
     setLineSub(findLine(rec,  'caixa',     ['caixa gerado', 'caixa']),   'entrou de fato no mês · base do ritmo diário');
-    setLineSub(findLine(rec,  'receber',   ['a receber', 'receber']),    'títulos a vencer · considera −10% de inadimplência');
+    setLineSub(findLine(rec,  'receber',   ['a receber', 'receber']),    'títulos a vencer · considera −20% de inadimplência');
     setLineSub(findLine(rec,  'atrasados', ['atrasado']),                'títulos vencidos e ainda não pagos');
     setLineSub(findLine(rec,  'saldo',     ['saldo em conta', 'saldo']), 'saldo atual em conta · compõe a receita');
     setLineSub(findLine(desp, 'apagar',    ['a pagar']),                 'compromissos em aberto no mês');
@@ -874,7 +875,7 @@ function recalc() {
         : (deficit > 0 ? 'a posição de hoje tem déficit de R$ ' + fmtBR(deficit) : 'a posição de hoje está equilibrada');
       obsP.textContent =
         diasTxt + ' em ' + monthName + '. Ritmo diário de receita R$ ' + fmtBR(ritmoRec) + '. ' +
-        'Projeção do mês — receita R$ ' + fmtBR(receitaProj) + ' (já com −10% de inadimplência), despesa fixa R$ ' + fmtBR(despesaProj) + ' (Paga + A pagar), resultado ' + sig(resultMes) + '. ' +
+        'Projeção do mês — receita R$ ' + fmtBR(receitaProj) + ' (ritmo 30% conservador, −20% inadimplência), despesa fixa R$ ' + fmtBR(despesaProj) + ' (Paga + A pagar), resultado ' + sig(resultMes) + '. ' +
         'Posição de hoje: ' + posTxt + '.';
     }
 
