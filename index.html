@@ -687,8 +687,8 @@ function setLineSub(ln, text) {
 /* reconstrói o layout da seção Projeção (migra automaticamente dados antigos do localStorage) */
 function ensureProjLayout() {
   var proj = document.querySelector('.proj');
-  if (!proj || proj.getAttribute('data-layout') === '6') return;
-  proj.setAttribute('data-layout', '6');
+  if (!proj || proj.getAttribute('data-layout') === '8') return;
+  proj.setAttribute('data-layout', '8');
   proj.innerHTML =
     '<div class="drivers">' +
       '<div class="driver"><label>Dias úteis do mês</label><input id="pTotal" readonly></div>' +
@@ -696,7 +696,7 @@ function ensureProjLayout() {
       '<div class="driver"><label>Restantes</label><input id="pDias" readonly></div>' +
       '<div class="driver"><label>Ritmo diário de receita</label><input id="pRitmoRec" readonly></div>' +
     '</div>' +
-    '<div class="result"><div class="rl"><span>Resultado projetado</span><small>ritmo diário × 0,75 (−25% pessimista) × dias restantes − A pagar</small></div><div class="rv" id="resultMes">—</div></div>' +
+    '<div class="result"><div class="rl"><span>Resultado projetado</span><small>A receber (−15%) + ritmo × 0,75 × dias restantes + Saldo em conta − A pagar</small></div><div class="rv" id="resultMes">—</div></div>' +
     '<div class="projnote" id="projNote"></div>' +
     '<button class="recbtn ctrl" onclick="recalc()">&#8635; Atualizar projeção</button>';
 }
@@ -816,13 +816,13 @@ function recalc() {
     var restantes = bizDaysFrom(y, mo, splitDay);  /* dias úteis restantes; diminui a cada dia útil */
     var decorr    = totalDU - restantes;           /* dias úteis já concluídos */
 
-    /* ritmo diário real = caixa ÷ dias úteis decorridos (exibido cheio) */
+    /* ritmo diário de receita = caixa ÷ dias úteis decorridos (exibido cheio) */
     var monthName = new Date(y, mo, 1).toLocaleDateString('pt-BR', {month: 'long'});
     var ritmoRec = caixa / Math.max(decorr, 1);
     if (!isFinite(ritmoRec)) ritmoRec = 0;
 
-    /* Resultado projetado = ritmo × 0,75 (−25% pessimista) × dias úteis restantes − A pagar */
-    var resultMes = ritmoRec * PROJ_FATOR * restantes - aPagar;
+    /* Resultado projetado = A receber (−15%) + ritmo × 0,75 (−25%) × dias restantes + Saldo em conta − A pagar */
+    var resultMes = receber * (1 - INAD) + ritmoRec * PROJ_FATOR * restantes + saldo - aPagar;
     if (!isFinite(resultMes)) resultMes = 0;
 
     var sig = function (v) { return (v >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(v)); };
@@ -837,7 +837,7 @@ function recalc() {
     setRV('resultMes', resultMes);
     var projNote = document.getElementById('projNote');
     if (projNote) projNote.textContent =
-      'Resultado projetado = ritmo diário real (Caixa ÷ dias decorridos) × 0,75 (−25% pessimista) × dias úteis restantes − A pagar. (A despesa já paga não desconta.)';
+      'Resultado projetado = A receber (−15% inadimplência) + ritmo diário (Caixa ÷ dias decorridos) × 0,75 (−25%) × dias úteis restantes + Saldo em conta − A pagar. Atrasados e Paga ficam fora da conta.';
 
     /* destaque (hero) = resultado do mês */
     var heroVal = resultMes;
@@ -846,7 +846,7 @@ function recalc() {
     var hl = document.querySelector('.hero .hl');
     if (hl) { lockCalc(hl); hl.textContent = 'Projeção de fechamento de ' + monthName; }
     var hs = document.querySelector('.hero .hs');
-    if (hs) { lockCalc(hs); hs.textContent = 'Ritmo diário real × 0,75 (−25% pessimista) × dias úteis restantes, menos o A pagar.'; }
+    if (hs) { lockCalc(hs); hs.textContent = 'A receber (−15%) + ritmo diário × 0,75 (−25%) × dias restantes + Saldo em conta, menos o A pagar.'; }
     var badge = document.querySelector('.hero .badge span');
     if (badge) { lockCalc(badge); badge.textContent = resultMes >= 0 ? 'Positiva' : 'Negativa'; }
 
@@ -867,7 +867,7 @@ function recalc() {
         : (deficit > 0 ? 'a posição de hoje tem déficit de R$ ' + fmtBR(deficit) : 'a posição de hoje está equilibrada');
       obsP.textContent =
         diasTxt + ' em ' + monthName + '. Ritmo diário real R$ ' + fmtBR(ritmoRec) + '. ' +
-        'Resultado projetado (ritmo × 0,75 × dias restantes − A pagar): ' + sig(resultMes) + '. ' +
+        'Resultado projetado (A receber −15% + ritmo × 0,75 × dias restantes + Saldo − A pagar): ' + sig(resultMes) + '. ' +
         'Posição de hoje: ' + posTxt + '.';
     }
 
