@@ -687,20 +687,16 @@ function setLineSub(ln, text) {
 /* reconstrói o layout da seção Projeção (migra automaticamente dados antigos do localStorage) */
 function ensureProjLayout() {
   var proj = document.querySelector('.proj');
-  if (!proj || proj.getAttribute('data-layout') === '4') return;
-  proj.setAttribute('data-layout', '4');
+  if (!proj || proj.getAttribute('data-layout') === '5') return;
+  proj.setAttribute('data-layout', '5');
   proj.innerHTML =
     '<div class="drivers">' +
       '<div class="driver"><label>Dias úteis do mês</label><input id="pTotal" readonly></div>' +
       '<div class="driver"><label>Decorridos</label><input id="pDecorr" readonly></div>' +
       '<div class="driver"><label>Restantes</label><input id="pDias" readonly></div>' +
-      '<div class="driver"><label>Ritmo diário (−25% conservador)</label><input id="pRitmoRec" readonly></div>' +
+      '<div class="driver"><label>Ritmo diário de receita</label><input id="pRitmoRec" readonly></div>' +
     '</div>' +
-    '<div class="projgrid">' +
-      '<div class="projrow"><span class="pk">Receita projetada do mês</span><span class="pv" id="receitaProj">—</span></div>' +
-      '<div class="projrow"><span class="pk">Despesa do mês (fixa)</span><span class="pv" id="despesaProj">—</span></div>' +
-    '</div>' +
-    '<div class="result"><div class="rl"><span>Resultado do mês</span><small>receita projetada − despesa fixa</small></div><div class="rv" id="resultMes">—</div></div>' +
+    '<div class="result"><div class="rl"><span>Resultado projetado</span><small>ritmo diário × 0,75 (−25% pessimista) × dias restantes</small></div><div class="rv" id="resultMes">—</div></div>' +
     '<div class="projnote" id="projNote"></div>' +
     '<button class="recbtn ctrl" onclick="recalc()">&#8635; Atualizar projeção</button>';
 }
@@ -820,23 +816,16 @@ function recalc() {
     var restantes = bizDaysFrom(y, mo, splitDay);  /* dias úteis restantes; diminui a cada dia útil */
     var decorr    = totalDU - restantes;           /* dias úteis já concluídos */
 
-    /* ritmo diário — apenas de receita (caixa ÷ dias decorridos) */
+    /* ritmo diário real = caixa ÷ dias úteis decorridos (exibido cheio) */
     var monthName = new Date(y, mo, 1).toLocaleDateString('pt-BR', {month: 'long'});
-    /* ritmo diário conservador = (caixa ÷ dias decorridos) − 25% */
-    var ritmoRec = (caixa / Math.max(decorr, 1)) * PROJ_FATOR;
+    var ritmoRec = caixa / Math.max(decorr, 1);
     if (!isFinite(ritmoRec)) ritmoRec = 0;
 
-    /* RECEITA = Caixa gerado + (ritmo conservador × dias restantes) + A receber (−15% inadimplência).
-       Atrasados NÃO entra na projeção. Saldo NÃO entra (= Caixa − Paga). DESPESA = fixa = Paga + A pagar. */
-    var receitaProj = caixa + ritmoRec * restantes + receber * (1 - INAD);
-    var despesaProj = pagaVal + aPagar;
-    var resultMes   = receitaProj - despesaProj;   /* resultado do mês */
-    if (!isFinite(receitaProj)) receitaProj = 0;
-    if (!isFinite(despesaProj)) despesaProj = 0;
-    if (!isFinite(resultMes))   resultMes   = 0;
+    /* Resultado projetado = ritmo diário × 0,75 (−25% pessimista) × dias úteis restantes */
+    var resultMes = ritmoRec * PROJ_FATOR * restantes;
+    if (!isFinite(resultMes)) resultMes = 0;
 
     var sig = function (v) { return (v >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(v)); };
-    var setPV = function (id, v) { var e = document.getElementById(id); if (e) e.textContent = 'R$ ' + fmtBR(v); };
     var setRV = function (id, v) { var e = document.getElementById(id); if (e) { e.textContent = sig(v); e.className = 'rv ' + (v >= 0 ? 'pos' : 'neg'); } };
 
     ensureProjLayout();
@@ -845,12 +834,10 @@ function recalc() {
     setField('pDias',      String(restantes));
     setField('pRitmoRec',  fmtBR(ritmoRec));
 
-    setPV('receitaProj', receitaProj);
-    setPV('despesaProj', despesaProj);
     setRV('resultMes', resultMes);
     var projNote = document.getElementById('projNote');
     if (projNote) projNote.textContent =
-      'Receita: Caixa gerado + ritmo diário conservador (−25%) × dias restantes + A receber (−15% inadimplência). Atrasados fora da projeção. Despesa fixa = Paga + A pagar. Saldo em conta = Caixa − Paga (automático, fora da soma).';
+      'Resultado projetado = ritmo diário real (Caixa ÷ dias decorridos) × 0,75 (−25% pessimista) × dias úteis restantes.';
 
     /* destaque (hero) = resultado do mês */
     var heroVal = resultMes;
@@ -859,7 +846,7 @@ function recalc() {
     var hl = document.querySelector('.hero .hl');
     if (hl) { lockCalc(hl); hl.textContent = 'Projeção de fechamento de ' + monthName; }
     var hs = document.querySelector('.hero .hs');
-    if (hs) { lockCalc(hs); hs.textContent = 'Receita projetada pelo ritmo diário (25% conservador) e recebíveis (−15% inadimplência em A receber) menos despesa fixa (Paga + A pagar).'; }
+    if (hs) { lockCalc(hs); hs.textContent = 'Ritmo diário real × 0,75 (−25% pessimista) × dias úteis restantes.'; }
     var badge = document.querySelector('.hero .badge span');
     if (badge) { lockCalc(badge); badge.textContent = resultMes >= 0 ? 'Positiva' : 'Negativa'; }
 
@@ -879,8 +866,8 @@ function recalc() {
         ? 'a posição de hoje já é superavitária em R$ ' + fmtBR(posicao)
         : (deficit > 0 ? 'a posição de hoje tem déficit de R$ ' + fmtBR(deficit) : 'a posição de hoje está equilibrada');
       obsP.textContent =
-        diasTxt + ' em ' + monthName + '. Ritmo diário conservador (−25%) R$ ' + fmtBR(ritmoRec) + '. ' +
-        'Projeção do mês — receita R$ ' + fmtBR(receitaProj) + ' (ritmo 25% conservador, −15% inadimplência em A receber), despesa fixa R$ ' + fmtBR(despesaProj) + ' (Paga + A pagar), resultado ' + sig(resultMes) + '. ' +
+        diasTxt + ' em ' + monthName + '. Ritmo diário real R$ ' + fmtBR(ritmoRec) + '. ' +
+        'Resultado projetado (ritmo × 0,75 × dias restantes): ' + sig(resultMes) + '. ' +
         'Posição de hoje: ' + posTxt + '.';
     }
 
