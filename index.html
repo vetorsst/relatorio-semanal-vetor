@@ -160,7 +160,10 @@ body.app{padding:78px 16px 40px}
 .projrow{display:flex;justify-content:space-between;align-items:center;padding:9px 2px;
   border-bottom:1px solid var(--line);font-size:13.5px}
 .projrow .pk{color:var(--muted);font-weight:600}
+.projrow .pk small{display:block;font-weight:400;font-size:11px;color:#9aa8b0;margin-top:1px}
 .projrow .pv{font-weight:700;font-variant-numeric:tabular-nums;color:var(--navy)}
+.projrow .pv.neg{color:var(--red)}
+.projrow .pv.pos{color:var(--navy)}
 .projnote{font-size:11.5px;color:var(--muted);margin-top:12px;font-style:italic}
 .result .rl{font-size:13px;font-weight:600;color:var(--muted)}
 .result .rl small{display:block;font-size:11px;font-weight:400;color:#9aa8b0}
@@ -687,8 +690,8 @@ function setLineSub(ln, text) {
 /* reconstrói o layout da seção Projeção (migra automaticamente dados antigos do localStorage) */
 function ensureProjLayout() {
   var proj = document.querySelector('.proj');
-  if (!proj || proj.getAttribute('data-layout') === '9') return;
-  proj.setAttribute('data-layout', '9');
+  if (!proj || proj.getAttribute('data-layout') === '10') return;
+  proj.setAttribute('data-layout', '10');
   proj.innerHTML =
     '<div class="drivers">' +
       '<div class="driver"><label>Dias úteis do mês</label><input id="pTotal" readonly></div>' +
@@ -696,7 +699,13 @@ function ensureProjLayout() {
       '<div class="driver"><label>Restantes</label><input id="pDias" readonly></div>' +
       '<div class="driver"><label>Ritmo diário de receita</label><input id="pRitmoRec" readonly></div>' +
     '</div>' +
-    '<div class="result"><div class="rl"><span>Resultado projetado</span><small>A receber (−15%) + ritmo × 0,70 × dias restantes + Saldo em conta − A pagar</small></div><div class="rv" id="resultMes">—</div></div>' +
+    '<div class="projgrid">' +
+      '<div class="projrow"><span class="pk">Saldo em conta hoje <small>(Caixa − Paga)</small></span><span class="pv" id="cascSaldo">—</span></div>' +
+      '<div class="projrow"><span class="pk">Recebíveis a entrar <small>(A receber −15%)</small></span><span class="pv" id="cascReceber">—</span></div>' +
+      '<div class="projrow"><span class="pk">Vendas novas projetadas <small>(ritmo −30% × dias restantes)</small></span><span class="pv" id="cascVendas">—</span></div>' +
+      '<div class="projrow"><span class="pk">Contas a pagar</span><span class="pv" id="cascPagar">—</span></div>' +
+    '</div>' +
+    '<div class="result"><div class="rl"><span>Saldo de caixa projetado</span><small>no fechamento do mês · soma das linhas acima</small></div><div class="rv" id="resultMes">—</div></div>' +
     '<div class="projnote" id="projNote"></div>' +
     '<button class="recbtn ctrl" onclick="recalc()">&#8635; Atualizar projeção</button>';
 }
@@ -821,11 +830,15 @@ function recalc() {
     var ritmoRec = caixa / Math.max(decorr, 1);
     if (!isFinite(ritmoRec)) ritmoRec = 0;
 
-    /* Resultado projetado = A receber (−15%) + ritmo × 0,70 (−30%) × dias restantes + Saldo em conta − A pagar */
-    var resultMes = receber * (1 - INAD) + ritmoRec * PROJ_FATOR * restantes + saldo - aPagar;
+    /* Saldo de caixa projetado (cascata):
+       Saldo (Caixa−Paga) + Recebíveis (A receber −15%) + Vendas novas (ritmo −30% × restantes) − A pagar */
+    var receberNet = receber * (1 - INAD);
+    var vendasProj = ritmoRec * PROJ_FATOR * restantes;
+    var resultMes  = saldo + receberNet + vendasProj - aPagar;
     if (!isFinite(resultMes)) resultMes = 0;
 
     var sig = function (v) { return (v >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(v)); };
+    var setCasc = function (id, v) { var e = document.getElementById(id); if (e) { e.textContent = sig(v); e.className = 'pv ' + (v >= 0 ? 'pos' : 'neg'); } };
     var setRV = function (id, v) { var e = document.getElementById(id); if (e) { e.textContent = sig(v); e.className = 'rv ' + (v >= 0 ? 'pos' : 'neg'); } };
 
     ensureProjLayout();
@@ -834,19 +847,23 @@ function recalc() {
     setField('pDias',      String(restantes));
     setField('pRitmoRec',  fmtBR(ritmoRec));
 
+    setCasc('cascSaldo',   saldo);
+    setCasc('cascReceber', receberNet);
+    setCasc('cascVendas',  vendasProj);
+    setCasc('cascPagar',   -aPagar);
     setRV('resultMes', resultMes);
     var projNote = document.getElementById('projNote');
     if (projNote) projNote.textContent =
-      'Resultado projetado = A receber (−15% inadimplência) + ritmo diário (Caixa ÷ dias decorridos) × 0,70 (−30%) × dias úteis restantes + Saldo em conta − A pagar. Atrasados e Paga ficam fora da conta.';
+      'Saldo de caixa projetado no fim do mês = Saldo em conta (Caixa − Paga) + A receber (−15% inadimplência) + ritmo diário (Caixa ÷ dias decorridos) × 0,70 (−30%) × dias úteis restantes − A pagar. Atrasados fica fora da conta.';
 
-    /* destaque (hero) = resultado do mês */
+    /* destaque (hero) = saldo de caixa projetado */
     var heroVal = resultMes;
     var hv = document.querySelector('.hero .hv');
     if (hv) { lockCalc(hv); hv.textContent = '≈ ' + (heroVal >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(heroVal), 0); }
     var hl = document.querySelector('.hero .hl');
-    if (hl) { lockCalc(hl); hl.textContent = 'Projeção de fechamento de ' + monthName; }
+    if (hl) { lockCalc(hl); hl.textContent = 'Saldo de caixa projetado — fim de ' + monthName; }
     var hs = document.querySelector('.hero .hs');
-    if (hs) { lockCalc(hs); hs.textContent = 'A receber (−15%) + ritmo diário × 0,70 (−30%) × dias restantes + Saldo em conta, menos o A pagar.'; }
+    if (hs) { lockCalc(hs); hs.textContent = 'Saldo hoje + recebíveis (−15%) + vendas projetadas (ritmo −30% × dias restantes) − A pagar.'; }
     var badge = document.querySelector('.hero .badge span');
     if (badge) { lockCalc(badge); badge.textContent = resultMes >= 0 ? 'Positiva' : 'Negativa'; }
 
