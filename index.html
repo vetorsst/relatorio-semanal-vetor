@@ -826,9 +826,9 @@ function recalc() {
     var ritmoRec = (caixa / Math.max(decorr, 1)) * PROJ_FATOR;
     if (!isFinite(ritmoRec)) ritmoRec = 0;
 
-    /* RECEITA = Caixa gerado + (ritmo conservador × dias restantes) + A receber (−15% inadimplência) + Atrasados.
-       Inadimplência só sobre "A receber". Saldo NÃO entra (= Caixa − Paga). DESPESA = fixa = Paga + A pagar. */
-    var receitaProj = caixa + ritmoRec * restantes + receber * (1 - INAD) + atrasados;
+    /* RECEITA = Caixa gerado + (ritmo conservador × dias restantes) + A receber (−15% inadimplência).
+       Atrasados NÃO entra na projeção. Saldo NÃO entra (= Caixa − Paga). DESPESA = fixa = Paga + A pagar. */
+    var receitaProj = caixa + ritmoRec * restantes + receber * (1 - INAD);
     var despesaProj = pagaVal + aPagar;
     var resultMes   = receitaProj - despesaProj;   /* resultado do mês */
     if (!isFinite(receitaProj)) receitaProj = 0;
@@ -850,7 +850,7 @@ function recalc() {
     setRV('resultMes', resultMes);
     var projNote = document.getElementById('projNote');
     if (projNote) projNote.textContent =
-      'Receita: Caixa gerado + ritmo diário conservador (−25%) × dias restantes + A receber (−15% inadimplência) + Atrasados. Despesa fixa = Paga + A pagar. Saldo em conta = Caixa − Paga (automático, fora da soma).';
+      'Receita: Caixa gerado + ritmo diário conservador (−25%) × dias restantes + A receber (−15% inadimplência). Atrasados fora da projeção. Despesa fixa = Paga + A pagar. Saldo em conta = Caixa − Paga (automático, fora da soma).';
 
     /* destaque (hero) = resultado do mês */
     var heroVal = resultMes;
@@ -865,7 +865,7 @@ function recalc() {
 
     setLineSub(findLine(rec,  'caixa',     ['caixa gerado', 'caixa']),   'entrou de fato no mês · base do ritmo diário');
     setLineSub(findLine(rec,  'receber',   ['a receber', 'receber']),    'títulos a vencer · considera −15% de inadimplência');
-    setLineSub(findLine(rec,  'atrasados', ['atrasado']),                'títulos vencidos e ainda não pagos');
+    setLineSub(findLine(rec,  'atrasados', ['atrasado']),                'títulos vencidos e ainda não pagos · fora da projeção');
     setLineSub(findLine(rec,  'saldo',     ['saldo em conta', 'saldo']), 'automático: Caixa gerado − Despesa paga');
     setLineSub(findLine(desp, 'apagar',    ['a pagar']),                 'compromissos em aberto no mês');
     setLineSub(findLine(desp, 'paga',      ['paga']),                    'já liquidada no mês');
