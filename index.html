@@ -690,8 +690,8 @@ function setLineSub(ln, text) {
 /* reconstrói o layout da seção Projeção (migra automaticamente dados antigos do localStorage) */
 function ensureProjLayout() {
   var proj = document.querySelector('.proj');
-  if (!proj || proj.getAttribute('data-layout') === '11') return;
-  proj.setAttribute('data-layout', '11');
+  if (!proj || proj.getAttribute('data-layout') === '12') return;
+  proj.setAttribute('data-layout', '12');
   proj.innerHTML =
     '<div class="drivers">' +
       '<div class="driver"><label>Dias úteis do mês</label><input id="pTotal" readonly></div>' +
@@ -700,7 +700,7 @@ function ensureProjLayout() {
       '<div class="driver"><label>Ritmo diário de receita</label><input id="pRitmoRec" readonly></div>' +
     '</div>' +
     '<div class="projgrid">' +
-      '<div class="projrow"><span class="pk">Saldo em conta hoje <small>(Caixa − Paga)</small></span><span class="pv" id="cascSaldo">—</span></div>' +
+      '<div class="projrow"><span class="pk">Saldo em conta hoje <small>(informado)</small></span><span class="pv" id="cascSaldo">—</span></div>' +
       '<div class="projrow"><span class="pk">Recebíveis a entrar <small>(A receber −15%)</small></span><span class="pv" id="cascReceber">—</span></div>' +
       '<div class="projrow"><span class="pk">Vendas novas projetadas <small>(ritmo −50% × dias restantes)</small></span><span class="pv" id="cascVendas">—</span></div>' +
       '<div class="projrow"><span class="pk">Contas a pagar</span><span class="pv" id="cascPagar">—</span></div>' +
@@ -783,10 +783,11 @@ function recalc() {
     var atrasados = lineVal(rec,  'atrasados', ['atrasado']);
     var aPagar    = lineVal(desp, 'apagar',    ['a pagar']);
 
-    /* Saldo em conta = Caixa gerado − Despesa paga (automático; NÃO entra na soma da receita) */
-    var saldo = caixa - pagaVal;
+    /* Saldo em conta = valor informado (editável). Destrava o campo caso tenha ficado travado (auto) antes. */
     var saldoLn = findLine(rec, 'saldo', ['saldo em conta', 'saldo']);
-    if (saldoLn) { var sv = saldoLn.querySelector('.val'); if (sv) { lockCalc(sv); sv.textContent = 'R$ ' + fmtBR(saldo); } }
+    var saldoSv = saldoLn ? saldoLn.querySelector('.val') : null;
+    if (saldoSv) { saldoSv.classList.remove('calc'); saldoSv.setAttribute('contenteditable', document.body.classList.contains('editing') ? 'true' : 'false'); }
+    var saldo = saldoSv ? parseBR(saldoSv.textContent) : 0;
 
     /* posição = saldo + a receber (−15%) + atrasados − a pagar */
     var posicao = saldo + receber * (1 - INAD) + atrasados - aPagar;
@@ -831,7 +832,7 @@ function recalc() {
     if (!isFinite(ritmoRec)) ritmoRec = 0;
 
     /* Saldo de caixa projetado (cascata):
-       Saldo (Caixa−Paga) + Recebíveis (A receber −15%) + Vendas novas (ritmo −50% × restantes) − A pagar */
+       Saldo (informado) + Recebíveis (A receber −15%) + Vendas novas (ritmo −50% × restantes) − A pagar */
     var receberNet = receber * (1 - INAD);
     var vendasProj = ritmoRec * PROJ_FATOR * restantes;
     var resultMes  = saldo + receberNet + vendasProj - aPagar;
@@ -854,7 +855,7 @@ function recalc() {
     setRV('resultMes', resultMes);
     var projNote = document.getElementById('projNote');
     if (projNote) projNote.textContent =
-      'Saldo de caixa projetado no fim do mês = Saldo em conta (Caixa − Paga) + A receber (−15% inadimplência) + ritmo diário (Caixa ÷ dias decorridos) × 0,50 (−50%) × dias úteis restantes − A pagar. Atrasados fica fora da conta.';
+      'Saldo de caixa projetado no fim do mês = Saldo em conta (informado) + A receber (−15% inadimplência) + ritmo diário (Caixa ÷ dias decorridos) × 0,50 (−50%) × dias úteis restantes − A pagar. Atrasados fica fora da conta.';
 
     /* destaque (hero) = saldo de caixa projetado */
     var heroVal = resultMes;
@@ -870,7 +871,7 @@ function recalc() {
     setLineSub(findLine(rec,  'caixa',     ['caixa gerado', 'caixa']),   'entrou de fato no mês · base do ritmo diário');
     setLineSub(findLine(rec,  'receber',   ['a receber', 'receber']),    'títulos a vencer · considera −15% de inadimplência');
     setLineSub(findLine(rec,  'atrasados', ['atrasado']),                'títulos vencidos e ainda não pagos · fora da projeção');
-    setLineSub(findLine(rec,  'saldo',     ['saldo em conta', 'saldo']), 'automático: Caixa gerado − Despesa paga');
+    setLineSub(findLine(rec,  'saldo',     ['saldo em conta', 'saldo']), 'quanto você tem em conta hoje');
     setLineSub(findLine(desp, 'apagar',    ['a pagar']),                 'compromissos em aberto no mês');
     setLineSub(findLine(desp, 'paga',      ['paga']),                    'já liquidada no mês');
 
