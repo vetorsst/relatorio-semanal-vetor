@@ -405,7 +405,7 @@ body:not(.editing) .addsection{display:none}
           <div class="driver"><label>Dias úteis do mês</label><input id="pTotal" readonly></div>
           <div class="driver"><label>Dias úteis decorridos</label><input id="pDecorr" readonly></div>
           <div class="driver"><label>Dias úteis restantes</label><input id="pDias" readonly></div>
-          <div class="driver"><label>Ritmo diário de receita</label><input id="pRitmo" readonly></div>
+          <div class="driver"><label>Ritmo diário (−25% conservador)</label><input id="pRitmo" readonly></div>
           <div class="driver"><label>Déficit a cobrir</label><input id="pDef" readonly></div>
         </div>
         <div class="bars">
@@ -694,7 +694,7 @@ function ensureProjLayout() {
       '<div class="driver"><label>Dias úteis do mês</label><input id="pTotal" readonly></div>' +
       '<div class="driver"><label>Decorridos</label><input id="pDecorr" readonly></div>' +
       '<div class="driver"><label>Restantes</label><input id="pDias" readonly></div>' +
-      '<div class="driver"><label>Ritmo diário de receita</label><input id="pRitmoRec" readonly></div>' +
+      '<div class="driver"><label>Ritmo diário (−25% conservador)</label><input id="pRitmoRec" readonly></div>' +
     '</div>' +
     '<div class="projgrid">' +
       '<div class="projrow"><span class="pk">Receita projetada do mês</span><span class="pv" id="receitaProj">—</span></div>' +
@@ -822,12 +822,13 @@ function recalc() {
 
     /* ritmo diário — apenas de receita (caixa ÷ dias decorridos) */
     var monthName = new Date(y, mo, 1).toLocaleDateString('pt-BR', {month: 'long'});
-    var ritmoRec = caixa / Math.max(decorr, 1);
+    /* ritmo diário conservador = (caixa ÷ dias decorridos) − 25% */
+    var ritmoRec = (caixa / Math.max(decorr, 1)) * PROJ_FATOR;
     if (!isFinite(ritmoRec)) ritmoRec = 0;
 
-    /* RECEITA = Caixa gerado + (ritmo × 0,75 × dias restantes) + A receber (−15% inadimplência) + Atrasados.
+    /* RECEITA = Caixa gerado + (ritmo conservador × dias restantes) + A receber (−15% inadimplência) + Atrasados.
        Inadimplência só sobre "A receber". Saldo NÃO entra (= Caixa − Paga). DESPESA = fixa = Paga + A pagar. */
-    var receitaProj = caixa + ritmoRec * PROJ_FATOR * restantes + receber * (1 - INAD) + atrasados;
+    var receitaProj = caixa + ritmoRec * restantes + receber * (1 - INAD) + atrasados;
     var despesaProj = pagaVal + aPagar;
     var resultMes   = receitaProj - despesaProj;   /* resultado do mês */
     if (!isFinite(receitaProj)) receitaProj = 0;
@@ -849,7 +850,7 @@ function recalc() {
     setRV('resultMes', resultMes);
     var projNote = document.getElementById('projNote');
     if (projNote) projNote.textContent =
-      'Receita: Caixa gerado + ritmo diário × 0,75 (25% conservador) × dias restantes + A receber (−15% inadimplência) + Atrasados. Despesa fixa = Paga + A pagar. Saldo em conta = Caixa − Paga (automático, fora da soma).';
+      'Receita: Caixa gerado + ritmo diário conservador (−25%) × dias restantes + A receber (−15% inadimplência) + Atrasados. Despesa fixa = Paga + A pagar. Saldo em conta = Caixa − Paga (automático, fora da soma).';
 
     /* destaque (hero) = resultado do mês */
     var heroVal = resultMes;
@@ -878,7 +879,7 @@ function recalc() {
         ? 'a posição de hoje já é superavitária em R$ ' + fmtBR(posicao)
         : (deficit > 0 ? 'a posição de hoje tem déficit de R$ ' + fmtBR(deficit) : 'a posição de hoje está equilibrada');
       obsP.textContent =
-        diasTxt + ' em ' + monthName + '. Ritmo diário de receita R$ ' + fmtBR(ritmoRec) + '. ' +
+        diasTxt + ' em ' + monthName + '. Ritmo diário conservador (−25%) R$ ' + fmtBR(ritmoRec) + '. ' +
         'Projeção do mês — receita R$ ' + fmtBR(receitaProj) + ' (ritmo 25% conservador, −15% inadimplência em A receber), despesa fixa R$ ' + fmtBR(despesaProj) + ' (Paga + A pagar), resultado ' + sig(resultMes) + '. ' +
         'Posição de hoje: ' + posTxt + '.';
     }
