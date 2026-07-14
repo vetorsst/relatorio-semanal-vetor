@@ -687,8 +687,8 @@ function setLineSub(ln, text) {
 /* reconstrói o layout da seção Projeção (migra automaticamente dados antigos do localStorage) */
 function ensureProjLayout() {
   var proj = document.querySelector('.proj');
-  if (!proj || proj.getAttribute('data-layout') === '5') return;
-  proj.setAttribute('data-layout', '5');
+  if (!proj || proj.getAttribute('data-layout') === '6') return;
+  proj.setAttribute('data-layout', '6');
   proj.innerHTML =
     '<div class="drivers">' +
       '<div class="driver"><label>Dias úteis do mês</label><input id="pTotal" readonly></div>' +
@@ -696,7 +696,7 @@ function ensureProjLayout() {
       '<div class="driver"><label>Restantes</label><input id="pDias" readonly></div>' +
       '<div class="driver"><label>Ritmo diário de receita</label><input id="pRitmoRec" readonly></div>' +
     '</div>' +
-    '<div class="result"><div class="rl"><span>Resultado projetado</span><small>ritmo diário × 0,75 (−25% pessimista) × dias restantes</small></div><div class="rv" id="resultMes">—</div></div>' +
+    '<div class="result"><div class="rl"><span>Resultado projetado</span><small>ritmo diário × 0,75 (−25% pessimista) × dias restantes − A pagar</small></div><div class="rv" id="resultMes">—</div></div>' +
     '<div class="projnote" id="projNote"></div>' +
     '<button class="recbtn ctrl" onclick="recalc()">&#8635; Atualizar projeção</button>';
 }
@@ -821,8 +821,8 @@ function recalc() {
     var ritmoRec = caixa / Math.max(decorr, 1);
     if (!isFinite(ritmoRec)) ritmoRec = 0;
 
-    /* Resultado projetado = ritmo diário × 0,75 (−25% pessimista) × dias úteis restantes */
-    var resultMes = ritmoRec * PROJ_FATOR * restantes;
+    /* Resultado projetado = ritmo × 0,75 (−25% pessimista) × dias úteis restantes − A pagar */
+    var resultMes = ritmoRec * PROJ_FATOR * restantes - aPagar;
     if (!isFinite(resultMes)) resultMes = 0;
 
     var sig = function (v) { return (v >= 0 ? '+' : '−') + 'R$ ' + fmtBR(Math.abs(v)); };
@@ -837,7 +837,7 @@ function recalc() {
     setRV('resultMes', resultMes);
     var projNote = document.getElementById('projNote');
     if (projNote) projNote.textContent =
-      'Resultado projetado = ritmo diário real (Caixa ÷ dias decorridos) × 0,75 (−25% pessimista) × dias úteis restantes.';
+      'Resultado projetado = ritmo diário real (Caixa ÷ dias decorridos) × 0,75 (−25% pessimista) × dias úteis restantes − A pagar. (A despesa já paga não desconta.)';
 
     /* destaque (hero) = resultado do mês */
     var heroVal = resultMes;
@@ -846,7 +846,7 @@ function recalc() {
     var hl = document.querySelector('.hero .hl');
     if (hl) { lockCalc(hl); hl.textContent = 'Projeção de fechamento de ' + monthName; }
     var hs = document.querySelector('.hero .hs');
-    if (hs) { lockCalc(hs); hs.textContent = 'Ritmo diário real × 0,75 (−25% pessimista) × dias úteis restantes.'; }
+    if (hs) { lockCalc(hs); hs.textContent = 'Ritmo diário real × 0,75 (−25% pessimista) × dias úteis restantes, menos o A pagar.'; }
     var badge = document.querySelector('.hero .badge span');
     if (badge) { lockCalc(badge); badge.textContent = resultMes >= 0 ? 'Positiva' : 'Negativa'; }
 
@@ -867,7 +867,7 @@ function recalc() {
         : (deficit > 0 ? 'a posição de hoje tem déficit de R$ ' + fmtBR(deficit) : 'a posição de hoje está equilibrada');
       obsP.textContent =
         diasTxt + ' em ' + monthName + '. Ritmo diário real R$ ' + fmtBR(ritmoRec) + '. ' +
-        'Resultado projetado (ritmo × 0,75 × dias restantes): ' + sig(resultMes) + '. ' +
+        'Resultado projetado (ritmo × 0,75 × dias restantes − A pagar): ' + sig(resultMes) + '. ' +
         'Posição de hoje: ' + posTxt + '.';
     }
 
