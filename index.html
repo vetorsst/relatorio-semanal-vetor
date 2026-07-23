@@ -365,6 +365,7 @@ body:not(.editing) .addsection{display:none}
             <div class="line" data-role="receber"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">A receber</span><span class="sub" contenteditable="true">títulos em aberto a vencer · considera −15% inadimplência</span></div><div class="val" contenteditable="true">R$ 36.882,76</div></div>
             <div class="line" data-role="atrasados"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Atrasados</span><span class="sub" contenteditable="true">inadimplência da semana</span></div><div class="val" contenteditable="true">R$ 4.640,00</div></div>
             <div class="line" data-role="saldo"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Saldo em conta</span><span class="sub" contenteditable="true">posição atual</span></div><div class="val" contenteditable="true">R$ 25.043,84</div></div>
+            <div class="line" data-role="sicredi"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Sicredi Invest</span><span class="sub" contenteditable="true">aplicação financeira</span></div><div class="val" contenteditable="true">R$ 6.088,04</div></div>
           </div>
           <button class="addline ctrl" onclick="addLine(this)">+ adicionar linha</button>
         </div>
@@ -618,6 +619,22 @@ function migrateWording() {
   }
 }
 
+/* garante a linha "Sicredi Invest" no card de Receita (para dados já salvos no localStorage) */
+function ensureSicrediLine() {
+  var rec = document.querySelector('.fincard.rec');
+  if (!rec || findLine(rec, 'sicredi', ['sicredi'])) return;
+  var list = rec.querySelector('.linelist');
+  if (!list) return;
+  var row = document.createElement('div');
+  row.className = 'line';
+  row.setAttribute('data-role', 'sicredi');
+  row.innerHTML = '<button class="del ctrl" onclick="delLine(this)">&#215;</button>' +
+    '<div class="lbl"><span contenteditable="true">Sicredi Invest</span>' +
+    '<span class="sub" contenteditable="true">aplicação financeira</span></div>' +
+    '<div class="val" contenteditable="true">R$ 6.088,04</div>';
+  list.appendChild(row);
+}
+
 var MC_TEMPLATE = null;   /* HTML original do Monte Carlo (capturado do seed antes do restore) */
 function showApp() {
   document.getElementById('login-screen').classList.add('hidden');
@@ -625,8 +642,9 @@ function showApp() {
   document.body.classList.add('app');
   if (MC_TEMPLATE === null) { var mb = document.querySelector('.mc-box'); MC_TEMPLATE = mb ? mb.innerHTML : ''; }
   restoreData();
-  ensureMCLayout();   /* migra MC redesenhado -> original, se necessário */
-  migrateWording();   /* corrige textos "semana" -> "mês" em dados salvos */
+  ensureMCLayout();     /* migra MC redesenhado -> original, se necessário */
+  migrateWording();     /* corrige textos "semana" -> "mês" em dados salvos */
+  ensureSicrediLine();  /* adiciona a linha "Sicredi Invest" se ainda não existir */
   bindEvents();
   recalc();
   setTimeout(runMC, 80);
