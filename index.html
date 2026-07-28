@@ -73,6 +73,10 @@ body.app{padding:78px 16px 40px}
 .hint{font-size:11px;color:#9fc0d2;font-weight:400;margin-left:4px}
 .save-toast{font-size:11px;color:#6fcf97;font-weight:600;opacity:0;transition:opacity .3s;white-space:nowrap}
 .save-toast.saving{color:#9fc0d2}
+.sheet-status{font-size:11px;color:#9fc0d2;font-weight:600;white-space:nowrap;margin-left:4px}
+.sheet-status.ok{color:#6fcf97}
+.sheet-status.warn{color:#f2c94c}
+html[data-snapshot] #btnRefresh{display:none}
 
 /* ---------- Page ---------- */
 .page{max-width:860px;margin:0 auto;background:var(--card);border-radius:16px;overflow:hidden;
@@ -323,6 +327,8 @@ body:not(.editing) .addsection{display:none}
   <button class="tbtn" onclick="toggleEdit()" id="editToggle">&#9998; Editar</button>
   <button class="tbtn" onclick="window.print()">&#128424; Imprimir / PDF</button>
   <button class="tbtn primary" onclick="downloadHTML()">&#8595; Baixar HTML</button>
+  <button class="tbtn" onclick="carregarPlanilha(true)" id="btnRefresh">&#128260; Atualizar</button>
+  <span class="sheet-status" id="sheetStatus"></span>
   <span class="save-toast" id="saveToast">&#10003; Salvo</span>
 </div>
 
@@ -605,6 +611,110 @@ async function doLogin() {
   }
 }
 
+/* ===== PLANILHA (CSV publicado da ponte "relatorio-api") ===== */
+/* Arquivo > Compartilhar > Publicar na web > aba da ponte > CSV. Cole a URL abaixo. */
+var SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQwXlxjSaVeGH1D7XvxIC3Zm7hDDl4-1OHES4al48yRHKyiXCS3j-GbAVDWDkSPG3Qvztjs26cdibaE/pub?output=csv';
+
+/* chave do CSV -> card + keywords de fallback (idênticas às usadas pelo recalc) */
+var SHEET_MAP = {
+  caixa:     { card: 'rec',  kw: ['caixa gerado', 'caixa'] },
+  receber:   { card: 'rec',  kw: ['a receber', 'receber'] },
+  atrasados: { card: 'rec',  kw: ['atrasado'] },
+  saldo:     { card: 'rec',  kw: ['saldo em conta', 'saldo'] },
+  sicredi:   { card: 'rec',  kw: ['sicredi'] },
+  paga:      { card: 'desp', kw: ['paga'] },
+  apagar:    { card: 'desp', kw: ['a pagar'] }
+};
+
+/* divide uma linha CSV respeitando aspas ("R$ 1.234,56" vira uma célula só) */
+function parseCSVLinha(line) {
+  var cells = [], cur = '', inQ = false;
+  for (var i = 0; i < line.length; i++) {
+    var ch = line.charAt(i);
+    if (inQ) {
+      if (ch === '"') { if (line.charAt(i + 1) === '"') { cur += '"'; i++; } else inQ = false; }
+      else cur += ch;
+    } else {
+      if (ch === '"') inQ = true;
+      else if (ch === ',') { cells.push(cur); cur = ''; }
+      else cur += ch;
+    }
+  }
+  cells.push(cur);
+  return cells;
+}
+
+function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+/* reusa o #saveToast da toolbar (mesmo padrão do persistData) */
+function toastMsg(html) {
+  var t = document.getElementById('saveToast');
+  if (!t) return;
+  clearTimeout(t._t);
+  t.classList.remove('saving');
+  t.innerHTML = html;
+  t.style.opacity = '1';
+  t._t = setTimeout(function() { t.style.opacity = '0'; }, 2500);
+}
+
+function sheetStatus(txt, cls) {
+  var el = document.getElementById('sheetStatus');
+  if (el) { el.textContent = txt; el.className = 'sheet-status' + (cls ? ' ' + cls : ''); }
+}
+
+function carregarPlanilha(manual) {
+  /* snapshot baixado é registro histórico: nunca re-busca */
+  if (document.documentElement.hasAttribute('data-snapshot')) return;
+
+  if (!SHEET_CSV_URL || SHEET_CSV_URL.indexOf('output=csv') === -1) {
+    sheetStatus('Planilha não configurada · valores locais', 'warn');
+    return;
+  }
+
+  sheetStatus('Atualizando da planilha…', '');
+  /* cache-busting p/ caches intermediários (o cache ~5min do próprio Google não é contornável) */
+  var url = SHEET_CSV_URL + (SHEET_CSV_URL.indexOf('?') > -1 ? '&' : '?') + 't=' + Date.now();
+
+  fetch(url, { cache: 'no-store' })
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+    .then(function(csv) {
+      var rec  = document.querySelector('.fincard.rec');
+      var desp = document.querySelector('.fincard.desp');
+      var linhas = csv.split(/\r?\n/), aplicado = 0;
+      for (var i = 0; i < linhas.length; i++) {
+        if (!linhas[i].trim()) continue;
+        var cel   = parseCSVLinha(linhas[i]);
+        var chave = (cel[0] || '').replace(/"/g, '').trim().toLowerCase();
+        var cfg   = SHEET_MAP[chave];
+        if (!cfg) continue;                           /* cabeçalho, saldo_inicial_mes etc.: ignora */
+        var ln  = findLine(cfg.card === 'rec' ? rec : desp, chave, cfg.kw);
+        var val = ln ? ln.querySelector('.val') : null;
+        if (!val) continue;                           /* linha ausente no DOM: mantém como está */
+        var bruto = (cel[1] || '').trim();
+        if (!bruto) continue;                         /* célula vazia: mantém valor atual */
+        if (document.activeElement === val) continue; /* não sobrescrever célula sendo editada */
+        /* "89.566" (só pontos de milhar, sem decimais) enganaria o parseBR — normaliza antes */
+        if (/^-?\d{1,3}(\.\d{3})+$/.test(bruto.replace(/[^\d.,-]/g, ''))) {
+          bruto = bruto.replace(/\./g, '');
+        }
+        var num = parseBR(bruto);
+        val.textContent = (num < 0 ? '-R$ ' : 'R$ ') + fmtBR(Math.abs(num));
+        aplicado++;
+      }
+      if (!aplicado) throw new Error('CSV sem chaves reconhecidas');
+      recalc();                                       /* runMC dispara sozinho se o déficit mudou */
+      persistData();                                  /* últimos valores bons -> localStorage (fallback offline) */
+      var d = new Date();
+      sheetStatus('Atualizado da planilha em ' + pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) +
+                  ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()), 'ok');
+      toastMsg('&#10003; Planilha carregada');
+    })
+    .catch(function(e) {
+      sheetStatus('Sem conexão com a planilha · usando valores locais', 'warn');
+      if (manual) toastMsg('Falha ao atualizar da planilha');
+    });
+}
+
 /* corrige textos "semana/semanal" (do modelo antigo) em dados já salvos no localStorage */
 function migrateWording() {
   var reps = [
@@ -648,6 +758,7 @@ function showApp() {
   bindEvents();
   recalc();
   setTimeout(runMC, 80);
+  carregarPlanilha();   /* async: resolve após o boot; planilha vence o localStorage */
 }
 
 document.getElementById('pwd-input').addEventListener('keydown', function(e) {
@@ -976,7 +1087,9 @@ function downloadHTML() {
       e.setAttribute('contenteditable', 'true');
     });
   }
+  document.documentElement.setAttribute('data-snapshot', new Date().toISOString()); /* congela: snapshot não re-busca a planilha */
   var html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+  document.documentElement.removeAttribute('data-snapshot');
   var blob = new Blob([html], {type: 'text/html;charset=utf-8'});
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
