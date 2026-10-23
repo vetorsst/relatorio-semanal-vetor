@@ -11,6 +11,13 @@ As páginas compartilham a mesma senha (sessão vale para as duas) e têm links 
 
 Os 7 números dos cards **Receita** e **Despesa** são carregados automaticamente de uma planilha Google Sheets publicada em CSV; todo o resto (projeções, Monte Carlo, observações) é calculado no próprio navegador.
 
+Ordem das seções e o que cada uma deriva dos cards (ritmo diário = Caixa gerado ÷ dias úteis decorridos):
+
+- **Projeção (conservadora)** — Saldo + A receber −15% + ritmo × 0,30 × dias restantes − A pagar.
+- **Cenário positivo** — A receber −5% e vendas novas no ritmo atual (100%) até o fim do mês. Mostra o lucro do mês (Caixa gerado + recebíveis + vendas novas − Paga − A pagar, com margem) e o saldo de caixa projetado.
+- **Observações**.
+- **Monte Carlo** — sem campos manuais: Recursividade = A receber × 0,85 / 0,90 / 0,95 (mín / moda / máx); Vendas Novas = ritmo × 0,30 / 0,65 / 1,00 × dias restantes; Falta a cobrir = A pagar − Saldo em conta. A probabilidade de cobrir a falta equivale à chance de fechar o mês com caixa ≥ 0. Re-simula sempre que a planilha muda algum desses valores.
+
 ## Fonte de dados: a ponte "relatorio-api"
 
 O relatório **não** lê a planilha Financeiro 2026 diretamente. Ele lê uma planilha-ponte separada (**relatorio-api**), publicada na web como CSV, com 9 linhas:

@@ -177,6 +177,12 @@ html[data-snapshot] #btnRefresh{display:none}
 .recbtn{background:var(--navy);color:var(--yellow);border:none;border-radius:9px;
   padding:9px 16px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;margin-top:14px}
 .recbtn:hover{background:var(--navy2)}
+.proj.pos{border-color:#bfe6d3;background:#f7fcf9}
+.proj.pos .driver{background:#eef8f3;border-color:#d3eee1}
+.projsub{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--green);margin:20px 0 2px}
+.projrow.total .pk{color:var(--ink)}
+.projrow.total{border-bottom:2px solid var(--line)}
+.result .rl .delta{color:var(--green);font-weight:600}
 
 /* ---------- Observações ---------- */
 .obs{background:#f7f9fa;border-left:3px solid var(--yellow);border-radius:0 11px 11px 0;
@@ -186,10 +192,11 @@ html[data-snapshot] #btnRefresh{display:none}
 
 /* ---------- Monte Carlo ---------- */
 .mc-box{border:1px solid var(--line);border-radius:13px;padding:22px;margin-top:14px;background:#fcfdfd}
-.mc-dist-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:10px}
+.mc-dist-row{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:10px}
+.mc-src{font-size:10.5px;color:var(--muted);margin:-6px 0 10px}
 .mc-dist-col{display:flex;flex-direction:column;gap:4px}
 .mc-dist-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
-.mc-vars{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+.mc-vars{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:18px}
 .mc-var-card{background:#f5f8f9;border:1px solid var(--line);border-radius:10px;padding:14px 16px}
 .mc-var-card h4{font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px}
 .mc-field{margin-bottom:8px}
@@ -432,6 +439,32 @@ body:not(.editing) .addsection{display:none}
       </div>
     </div>
 
+    <!-- CENÁRIO POSITIVO -->
+    <div class="section" data-sec="positivo">
+      <div class="secctrl ctrl">
+        <button class="sbtn" onclick="moveSec(this,-1)" title="Subir">&#8593;</button>
+        <button class="sbtn" onclick="moveSec(this,1)" title="Descer">&#8595;</button>
+        <button class="sbtn x" onclick="delSec(this)" title="Remover seção">&#10005;</button>
+      </div>
+      <div class="eyebrow" contenteditable="true">Cenário positivo</div>
+      <h2 contenteditable="true">Lucratividade mantido o ritmo de vendas</h2>
+      <div class="proj pos" id="posBox"></div>
+    </div>
+
+    <!-- OBSERVAÇÕES -->
+    <div class="section">
+      <div class="secctrl ctrl">
+        <button class="sbtn" onclick="moveSec(this,-1)" title="Subir">&#8593;</button>
+        <button class="sbtn" onclick="moveSec(this,1)" title="Descer">&#8595;</button>
+        <button class="sbtn x" onclick="delSec(this)" title="Remover seção">&#10005;</button>
+      </div>
+      <div class="eyebrow" contenteditable="true">Leitura</div>
+      <h2 contenteditable="true">Observações</h2>
+      <div class="obs">
+        <p contenteditable="true">Restam 7 dias úteis e nosso ritmo diário de receita está em R$ 6.398,00. Mantido esse ritmo, o resultado final da semana deve fechar em aproximadamente R$ 20.000,00 positivos, mesmo absorvendo o déficit atual de R$ 21.885,00.</p>
+      </div>
+    </div>
+
     <!-- MONTE CARLO -->
     <div class="section">
       <div class="secctrl ctrl">
@@ -441,17 +474,10 @@ body:not(.editing) .addsection{display:none}
       </div>
       <div class="eyebrow">Simulação</div>
       <h2>Monte Carlo — Recebíveis + Vendas</h2>
-      <div class="mc-box">
+      <div class="mc-box" data-layout="auto1">
 
         <!-- Seletores de distribuição (fora dos cards) -->
         <div class="mc-dist-row">
-          <div class="mc-dist-col">
-            <span class="mc-dist-label" data-tip="Triangular: você sabe o valor mais provável (moda)&#10;Uniforme: qualquer valor entre mín e máx é igualmente provável">Distribuição — Exames</span>
-            <select class="mc-dist-select" id="exDist" onchange="onDistChange('ex')">
-              <option value="tri">Triangular</option>
-              <option value="uni">Uniforme</option>
-            </select>
-          </div>
           <div class="mc-dist-col">
             <span class="mc-dist-label" data-tip="Triangular: você sabe o valor mais provável (moda)&#10;Uniforme: qualquer valor entre mín e máx é igualmente provável">Distribuição — Recursividade</span>
             <select class="mc-dist-select" id="rdDist" onchange="onDistChange('rd')">
@@ -470,26 +496,21 @@ body:not(.editing) .addsection{display:none}
 
         <!-- Variáveis -->
         <div class="mc-vars">
-          <!-- Exames -->
-          <div class="mc-var-card">
-            <h4>Exames</h4>
-            <div class="mc-field"><label data-tip="Pior cenário possível para esta fonte de receita">Mínimo</label><input type="number" id="exMin" value="17000"></div>
-            <div class="mc-field" id="exModeWrap"><label data-tip="Valor mais provável — onde a distribuição tem seu pico">Moda</label><input type="number" id="exMode" value="19000"></div>
-            <div class="mc-field"><label data-tip="Melhor cenário possível para esta fonte de receita">Máximo</label><input type="number" id="exMax" value="21000"></div>
-          </div>
-          <!-- Recursividade -->
+          <!-- Recursividade (automático: A receber da planilha) -->
           <div class="mc-var-card">
             <h4>Recursividade</h4>
-            <div class="mc-field"><label data-tip="Pior cenário possível para esta fonte de receita">Mínimo</label><input type="number" id="rdMin" value="39000"></div>
-            <div class="mc-field" id="rdModeWrap" style="display:none"><label data-tip="Valor mais provável — onde a distribuição tem seu pico">Moda</label><input type="number" id="rdMode" value="43000"></div>
-            <div class="mc-field"><label data-tip="Melhor cenário possível para esta fonte de receita">Máximo</label><input type="number" id="rdMax" value="47000"></div>
+            <p class="mc-src">A receber da planilha · inadimplência de 15% a 5%</p>
+            <div class="mc-field"><label data-tip="A receber × 0,85 (inadimplência de 15%)">Mínimo</label><input type="number" id="rdMin" value="39000" readonly></div>
+            <div class="mc-field" id="rdModeWrap" style="display:none"><label data-tip="A receber × 0,90 (inadimplência de 10%)">Moda</label><input type="number" id="rdMode" value="43000" readonly></div>
+            <div class="mc-field"><label data-tip="A receber × 0,95 (inadimplência de 5%)">Máximo</label><input type="number" id="rdMax" value="47000" readonly></div>
           </div>
-          <!-- Vendas Novas -->
+          <!-- Vendas Novas (automático: ritmo diário × dias úteis restantes) -->
           <div class="mc-var-card">
             <h4>Vendas Novas</h4>
-            <div class="mc-field"><label data-tip="Pior cenário possível para esta fonte de receita">Mínimo</label><input type="number" id="vnMin" value="20000"></div>
-            <div class="mc-field" id="vnModeWrap"><label data-tip="Valor mais provável — onde a distribuição tem seu pico">Moda</label><input type="number" id="vnMode" value="21000"></div>
-            <div class="mc-field"><label data-tip="Melhor cenário possível para esta fonte de receita">Máximo</label><input type="number" id="vnMax" value="24000"></div>
+            <p class="mc-src">ritmo diário × dias úteis restantes · de 30% a 100% do ritmo</p>
+            <div class="mc-field"><label data-tip="Ritmo × 0,30 × dias restantes (cenário conservador, −70%)">Mínimo</label><input type="number" id="vnMin" value="20000" readonly></div>
+            <div class="mc-field" id="vnModeWrap"><label data-tip="Ritmo × 0,65 × dias restantes (ponto médio)">Moda</label><input type="number" id="vnMode" value="21000" readonly></div>
+            <div class="mc-field"><label data-tip="Ritmo × 1,00 × dias restantes (cenário positivo)">Máximo</label><input type="number" id="vnMax" value="24000" readonly></div>
           </div>
         </div>
 
@@ -498,7 +519,7 @@ body:not(.editing) .addsection{display:none}
           <div class="mc-var-card">
             <h4>Configuração</h4>
             <div class="mc-field"><label>Nº de simulações</label><input type="number" id="mcN" value="10000"></div>
-            <div class="mc-field"><label>Falta a cobrir (R$)</label><input type="number" id="mcFalta" value="63207"></div>
+            <div class="mc-field"><label data-tip="A pagar − Saldo em conta: o que precisa entrar até o fim do mês para pagar tudo">Falta a cobrir (A pagar − Saldo)</label><input type="number" id="mcFalta" value="63207" readonly></div>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
             <button class="mc-runbtn" onclick="runMC()">&#9654; Rodar simulação</button>
@@ -542,7 +563,7 @@ body:not(.editing) .addsection{display:none}
 
         <!-- Comparação base × pessimista -->
         <div class="mc-compare" id="mcCompare" style="display:none">
-          <h4>Comparação: Cenário Base × Pessimista (Exames)</h4>
+          <h4>Comparação: Cenário Base × Pessimista</h4>
           <div class="mc-svg-wrap" style="margin-bottom:10px"><svg id="mcSvgCmp" viewBox="0 0 600 120" preserveAspectRatio="none"></svg></div>
           <div class="mc-compare-grid">
             <div class="mc-compare-col">
@@ -558,20 +579,6 @@ body:not(.editing) .addsection{display:none}
           </div>
         </div>
 
-      </div>
-    </div>
-
-    <!-- OBSERVAÇÕES -->
-    <div class="section">
-      <div class="secctrl ctrl">
-        <button class="sbtn" onclick="moveSec(this,-1)" title="Subir">&#8593;</button>
-        <button class="sbtn" onclick="moveSec(this,1)" title="Descer">&#8595;</button>
-        <button class="sbtn x" onclick="delSec(this)" title="Remover seção">&#10005;</button>
-      </div>
-      <div class="eyebrow" contenteditable="true">Leitura</div>
-      <h2 contenteditable="true">Observações</h2>
-      <div class="obs">
-        <p contenteditable="true">Restam 7 dias úteis e nosso ritmo diário de receita está em R$ 6.398,00. Mantido esse ritmo, o resultado final da semana deve fechar em aproximadamente R$ 20.000,00 positivos, mesmo absorvendo o déficit atual de R$ 21.885,00.</p>
       </div>
     </div>
 
@@ -755,6 +762,7 @@ function showApp() {
   if (MC_TEMPLATE === null) { var mb = document.querySelector('.mc-box'); MC_TEMPLATE = mb ? mb.innerHTML : ''; }
   restoreData();
   ensureMCLayout();     /* migra MC redesenhado -> original, se necessário */
+  ensurePosSection();   /* cria o "Cenário positivo" no lugar do Monte Carlo (que vai para o fim) */
   migrateWording();     /* corrige textos "semana" -> "mês" em dados salvos */
   ensureSicrediLine();  /* adiciona a linha "Sicredi Invest" se ainda não existir */
   bindEvents();
@@ -784,6 +792,7 @@ function fmtBR(n, dec) {
 /* ===== POSIÇÃO E PROJEÇÃO ===== */
 var INAD = 0.15;          /* inadimplência fixa aplicada sobre a receita projetada */
 var PROJ_FATOR = 0.30;    /* fator conservador: projeta 70% a menos de receita pelo ritmo atual */
+var INAD_POS = 0.05;      /* cenário positivo: inadimplência de 5% sobre o A receber */
 
 /* localiza uma linha pelo data-role (com fallback por nome do rótulo) */
 function findLine(card, role, keywords) {
@@ -841,12 +850,70 @@ function ensureProjLayout() {
     '<button class="recbtn ctrl" onclick="recalc()">&#8635; Atualizar projeção</button>';
 }
 
+/* garante a seção "Cenário positivo" (dados salvos antigos): entra no lugar do Monte Carlo, que vai para o fim */
+function ensurePosSection() {
+  if (document.getElementById('posBox')) return;
+  var secs = document.getElementById('sections');
+  var addBtn = secs ? secs.querySelector('.addsection') : null;
+  if (!secs) return;
+  var sec = document.createElement('div');
+  sec.className = 'section';
+  sec.setAttribute('data-sec', 'positivo');
+  sec.innerHTML =
+    '<div class="secctrl ctrl">' +
+    '<button class="sbtn" onclick="moveSec(this,-1)" title="Subir">&#8593;</button>' +
+    '<button class="sbtn" onclick="moveSec(this,1)" title="Descer">&#8595;</button>' +
+    '<button class="sbtn x" onclick="delSec(this)" title="Remover seção">&#10005;</button></div>' +
+    '<div class="eyebrow" contenteditable="true">Cenário positivo</div>' +
+    '<h2 contenteditable="true">Lucratividade mantido o ritmo de vendas</h2>' +
+    '<div class="proj pos" id="posBox"></div>';
+  var mcBox = secs.querySelector('.mc-box');
+  var mcSec = mcBox ? mcBox.closest('.section') : null;
+  var projBox = secs.querySelector('.proj');
+  var projSec = projBox ? projBox.closest('.section') : null;
+  if (mcSec) secs.insertBefore(sec, mcSec);
+  else if (projSec) secs.insertBefore(sec, projSec.nextSibling);
+  else secs.insertBefore(sec, addBtn);
+  if (mcSec) secs.insertBefore(mcSec, addBtn);   /* Monte Carlo vai para depois de tudo */
+}
+
+/* monta o conteúdo da seção "Cenário positivo" */
+function ensurePosLayout() {
+  var box = document.getElementById('posBox');
+  if (!box || box.getAttribute('data-layout') === 'pos1') return;
+  box.setAttribute('data-layout', 'pos1');
+  box.innerHTML =
+    '<div class="drivers">' +
+      '<div class="driver"><label>Ritmo diário mantido</label><input id="posRitmo" readonly></div>' +
+      '<div class="driver"><label>Dias úteis restantes</label><input id="posDias" readonly></div>' +
+      '<div class="driver"><label>Inadimplência</label><input id="posInad" readonly></div>' +
+    '</div>' +
+    '<div class="projsub">Lucratividade do mês</div>' +
+    '<div class="projgrid">' +
+      '<div class="projrow"><span class="pk">Receita já realizada <small>(Caixa gerado)</small></span><span class="pv" id="posCaixa">—</span></div>' +
+      '<div class="projrow"><span class="pk">Recebíveis a entrar <small>(A receber −5%)</small></span><span class="pv" id="posReceber">—</span></div>' +
+      '<div class="projrow"><span class="pk">Vendas novas projetadas <small>(ritmo atual × dias restantes)</small></span><span class="pv" id="posVendas">—</span></div>' +
+      '<div class="projrow total"><span class="pk">Receita projetada do mês</span><span class="pv" id="posReceita">—</span></div>' +
+      '<div class="projrow"><span class="pk">Despesas do mês <small>(Paga + A pagar)</small></span><span class="pv" id="posDespesa">—</span></div>' +
+    '</div>' +
+    '<div class="result"><div class="rl"><span>Lucro projetado do mês</span><small id="posMargem">—</small></div><div class="rv" id="posLucro">—</div></div>' +
+    '<div class="projsub">Caixa no fechamento</div>' +
+    '<div class="projgrid">' +
+      '<div class="projrow"><span class="pk">Saldo em conta hoje <small>(informado)</small></span><span class="pv" id="posSaldo">—</span></div>' +
+      '<div class="projrow"><span class="pk">Recebíveis + vendas novas <small>(cenário positivo)</small></span><span class="pv" id="posEntradas">—</span></div>' +
+      '<div class="projrow"><span class="pk">Contas a pagar</span><span class="pv" id="posPagar">—</span></div>' +
+    '</div>' +
+    '<div class="result"><div class="rl"><span>Saldo de caixa projetado</span><small id="posDelta">—</small></div><div class="rv" id="posCaixaFim">—</div></div>' +
+    '<div class="projnote" id="posNote"></div>';
+}
+
 /* migração do Monte Carlo: devolve o layout original (3 fontes) se veio o redesenhado do localStorage */
 function ensureMCLayout() {
-  /* migra o Monte Carlo redesenhado (cenários de ritmo) de volta ao original (3 fontes) */
-  if (document.getElementById('exMin')) return;   /* já é o Monte Carlo original */
+  /* troca qualquer layout salvo antigo pelo atual (Recursividade + Vendas Novas automáticas pela planilha) */
   var box = document.querySelector('.mc-box');
-  if (box && MC_TEMPLATE) box.innerHTML = MC_TEMPLATE;
+  if (!box || box.getAttribute('data-layout') === 'auto1') return;
+  if (MC_TEMPLATE) box.innerHTML = MC_TEMPLATE;
+  box.setAttribute('data-layout', 'auto1');
 }
 
 /* localiza o parágrafo da seção "Observações" (pelo título, robusto ao localStorage) */
@@ -902,7 +969,7 @@ function refYM() {
   return { y: now.getFullYear(), m: now.getMonth() };
 }
 
-var mcFaltaCache = null; /* evita re-rodar o Monte Carlo se o déficit não mudou */
+var mcFaltaCache = null; /* evita re-rodar o Monte Carlo se as entradas (planilha) não mudaram */
 
 function recalc() {
   try {
@@ -984,6 +1051,37 @@ function recalc() {
     setCasc('cascVendas',  vendasProj);
     setCasc('cascPagar',   -aPagar);
     setRV('resultMes', resultMes);
+
+    /* Cenário positivo: A receber −5% + vendas novas no ritmo atual (sem corte) até o fim do mês */
+    var receberPos = receber * (1 - INAD_POS);
+    var vendasPos  = ritmoRec * restantes;
+    var receitaPos = caixa + receberPos + vendasPos;
+    var despesaMes = pagaVal + aPagar;
+    var lucroPos   = receitaPos - despesaMes;
+    var margemPos  = receitaPos > 0 ? lucroPos / receitaPos * 100 : 0;
+    var caixaPos   = saldo + receberPos + vendasPos - aPagar;
+    ensurePosLayout();
+    setField('posRitmo', fmtBR(ritmoRec));
+    setField('posDias',  String(restantes));
+    setField('posInad',  fmtBR(INAD_POS * 100, 0) + '%');
+    setCasc('posCaixa',    caixa);
+    setCasc('posReceber',  receberPos);
+    setCasc('posVendas',   vendasPos);
+    setCasc('posReceita',  receitaPos);
+    setCasc('posDespesa',  -despesaMes);
+    setRV('posLucro', lucroPos);
+    var posMargem = document.getElementById('posMargem');
+    if (posMargem) posMargem.textContent = 'margem de ' + fmtBR(margemPos, 1) + '% sobre a receita projetada';
+    setCasc('posSaldo',    saldo);
+    setCasc('posEntradas', receberPos + vendasPos);
+    setCasc('posPagar',    -aPagar);
+    setRV('posCaixaFim', caixaPos);
+    var posDelta = document.getElementById('posDelta');
+    if (posDelta) posDelta.innerHTML = 'fim de ' + monthName + ' · <span class="delta">' + sig(caixaPos - resultMes) + ' vs. cenário conservador</span>';
+    var posNote = document.getElementById('posNote');
+    if (posNote) posNote.textContent =
+      'Cenário positivo: inadimplência de 5% sobre o A receber e vendas novas mantendo o ritmo diário atual (Caixa ÷ dias úteis decorridos) em todos os dias úteis restantes, sem desconto. Lucro = receita do mês (Caixa gerado + recebíveis + vendas novas) − despesas do mês (Paga + A pagar).';
+
     var projNote = document.getElementById('projNote');
     if (projNote) projNote.textContent =
       'Saldo de caixa projetado no fim do mês = Saldo em conta (informado) + A receber (−15% inadimplência) + ritmo diário (Caixa ÷ dias decorridos) × 0,30 (−70%) × dias úteis restantes − A pagar. Atrasados fica fora da conta.';
@@ -1020,10 +1118,18 @@ function recalc() {
         'Posição de hoje: ' + posTxt + '.';
     }
 
-    /* Monte Carlo: "Falta a cobrir" = déficit; re-simula quando o déficit muda */
-    var mcFaltaEl = document.getElementById('mcFalta');
-    if (mcFaltaEl) { mcFaltaEl.value = Math.round(deficit); mcFaltaEl.readOnly = true; }
-    if (deficit !== mcFaltaCache && typeof runMC === 'function') { mcFaltaCache = deficit; runMC(); }
+    /* Monte Carlo alimentado pelos cards (planilha):
+       Recursividade = A receber × 0,85 / 0,90 / 0,95 · Vendas Novas = ritmo × 0,30 / 0,65 / 1,00 × restantes
+       Falta a cobrir = A pagar − Saldo em conta (P(cobrir) = chance de fechar o mês com caixa ≥ 0) */
+    var mcFaltaVal = Math.max(Math.round(aPagar - saldo), 0);
+    var mcVals = {
+      rdMin: receber * (1 - INAD), rdMode: receber * 0.90, rdMax: receber * (1 - INAD_POS),
+      vnMin: ritmoRec * PROJ_FATOR * restantes, vnMode: ritmoRec * 0.65 * restantes, vnMax: ritmoRec * restantes,
+      mcFalta: mcFaltaVal
+    };
+    for (var mk in mcVals) setField(mk, String(Math.round(mcVals[mk])));
+    var mcSig = JSON.stringify(mcVals);
+    if (mcSig !== mcFaltaCache && typeof runMC === 'function') { mcFaltaCache = mcSig; runMC(); }
   } catch (e) {}
 }
 /* ===== LINHAS ===== */
@@ -1144,15 +1250,13 @@ function onDistChange(pfx) {
 
 /* -- simulação -- */
 function simulate(n) {
-  var exDist = document.getElementById('exDist').value;
   var rdDist = document.getElementById('rdDist').value;
   var vnDist = document.getElementById('vnDist').value;
   var res = new Array(n);
   for (var i = 0; i < n; i++) {
-    var ex = sample(exDist, getN('exMin'), getN('exMode'), getN('exMax'));
     var rd = sample(rdDist, getN('rdMin'), getN('rdMode'), getN('rdMax'));
     var vn = sample(vnDist, getN('vnMin'), getN('vnMode'), getN('vnMax'));
-    res[i] = ex + rd + vn;
+    res[i] = rd + vn;
   }
   res.sort(function(a, b) { return a - b; });
   return res;
