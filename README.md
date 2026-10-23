@@ -9,12 +9,12 @@ As páginas compartilham a mesma senha (sessão vale para as duas) e têm links 
 
 ## Relatório ao vivo (`index.html`)
 
-Os 7 números dos cards **Receita** e **Despesa** são carregados automaticamente de uma planilha Google Sheets publicada em CSV; todo o resto (projeções, Monte Carlo, observações) é calculado no próprio navegador.
+Os números dos cards **Receita** e **Despesa** (7 fixos + `vendas_avista` opcional) são carregados automaticamente de uma planilha Google Sheets publicada em CSV; todo o resto (projeções, Monte Carlo, observações) é calculado no próprio navegador.
 
-Ordem das seções e o que cada uma deriva dos cards (ritmo diário = Caixa gerado ÷ dias úteis decorridos):
+Ordem das seções e o que cada uma deriva dos cards. **Ritmo diário de vendas = Vendas à vista no mês ÷ dias úteis decorridos** (não usa o Caixa gerado). A linha "Vendas à vista no mês" vem da chave opcional `vendas_avista` da ponte; se a ponte não tiver essa chave, vale o valor digitado à mão (✎ Editar), e enquanto estiver zerada as vendas projetadas ficam em zero.
 
 - **Projeção (conservadora)** — Saldo + A receber −15% + ritmo × 0,30 × dias restantes − A pagar.
-- **Cenário positivo** — A receber −5% e vendas novas no ritmo atual (100%) até o fim do mês. Mostra o lucro do mês (Caixa gerado + recebíveis + vendas novas − Paga − A pagar, com margem) e o saldo de caixa projetado.
+- **Cenário positivo** — A receber −5% e vendas novas no ritmo de vendas à vista (100%) até o fim do mês. Mostra o lucro do mês (Caixa gerado + recebíveis + vendas novas − Paga − A pagar, com margem) e o saldo de caixa projetado.
 - **Observações**.
 - **Monte Carlo** — sem campos manuais: Recursividade = A receber × 0,85 / 0,90 / 0,95 (mín / moda / máx); Vendas Novas = ritmo × 0,30 / 0,65 / 1,00 × dias restantes; Falta a cobrir = A pagar − Saldo em conta. A probabilidade de cobrir a falta equivale à chance de fechar o mês com caixa ≥ 0. Re-simula sempre que a planilha muda algum desses valores.
 
@@ -33,6 +33,15 @@ O relatório **não** lê a planilha Financeiro 2026 diretamente. Ele lê uma pl
 | `paga` | | Despesa paga no mês |
 | `apagar` | | Despesa a pagar no mês |
 | `saldo_inicial_mes` | | usada por outras integrações — **ignorada** pelo relatório |
+| `vendas_avista` | | *opcional* — total vendido à vista no mês (Comercial - Base de Dados, aba `BI Comercial `, MODAL = "À vista") |
+
+Fórmula sugerida para `vendas_avista` (col. B; locale pt-BR, separador `;`). Na primeira vez o Sheets pede para clicar em **Permitir acesso** ao IMPORTRANGE:
+
+```
+=IFERROR(QUERY(IMPORTRANGE("1le9h4diCcpSy_Zr0sjajqynNb4fb_xlkUhbwtnqvGEM";"'BI Comercial '!D2:I");"select sum(Col6) where Col1 >= date '"&TEXT(EOMONTH(TODAY();-1)+1;"yyyy-mm-dd")&"' and Col1 <= date '"&TEXT(EOMONTH(TODAY();0);"yyyy-mm-dd")&"' and Col5 = 'À vista' label sum(Col6) ''";0);0)
+```
+
+(D = DATA, H = MODAL, I = VALOR. Requer DATA como data e VALOR como número; se a fórmula der 0 com vendas no mês, confira esses formatos.)
 
 As fórmulas da ponte replicam os filtros do Looker sobre as abas **Fluxo de Caixa**, **Contas a Receber** e **Contas a Pagar** da Financeiro 2026. O recorte de mês é dinâmico: no dia 1º a ponte passa a refletir o mês novo sozinha, sem intervenção.
 

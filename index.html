@@ -376,7 +376,8 @@ body:not(.editing) .addsection{display:none}
         <div class="fincard rec">
           <div class="ch"><span contenteditable="true">Receita</span></div>
           <div class="linelist">
-            <div class="line" data-role="caixa"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Caixa gerado</span><span class="sub" contenteditable="true">entrou de fato no mês · base do ritmo diário</span></div><div class="val" contenteditable="true">R$ 89.566,43</div></div>
+            <div class="line" data-role="caixa"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Caixa gerado</span><span class="sub" contenteditable="true">entrou de fato no mês</span></div><div class="val" contenteditable="true">R$ 89.566,43</div></div>
+            <div class="line" data-role="vendas_avista"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Vendas à vista no mês</span><span class="sub" contenteditable="true">total vendido à vista pelo comercial · base do ritmo de vendas</span></div><div class="val" contenteditable="true">R$ 0,00</div></div>
             <div class="line" data-role="receber"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">A receber</span><span class="sub" contenteditable="true">títulos em aberto a vencer · considera −15% inadimplência</span></div><div class="val" contenteditable="true">R$ 36.882,76</div></div>
             <div class="line" data-role="atrasados"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Atrasados</span><span class="sub" contenteditable="true">inadimplência da semana</span></div><div class="val" contenteditable="true">R$ 4.640,00</div></div>
             <div class="line" data-role="saldo"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Saldo em conta</span><span class="sub" contenteditable="true">posição atual</span></div><div class="val" contenteditable="true">R$ 25.043,84</div></div>
@@ -474,7 +475,7 @@ body:not(.editing) .addsection{display:none}
       </div>
       <div class="eyebrow">Simulação</div>
       <h2>Monte Carlo — Recebíveis + Vendas</h2>
-      <div class="mc-box" data-layout="auto1">
+      <div class="mc-box" data-layout="auto2">
 
         <!-- Seletores de distribuição (fora dos cards) -->
         <div class="mc-dist-row">
@@ -507,7 +508,7 @@ body:not(.editing) .addsection{display:none}
           <!-- Vendas Novas (automático: ritmo diário × dias úteis restantes) -->
           <div class="mc-var-card">
             <h4>Vendas Novas</h4>
-            <p class="mc-src">ritmo diário × dias úteis restantes · de 30% a 100% do ritmo</p>
+            <p class="mc-src">vendas à vista ÷ dias decorridos × dias restantes · de 30% a 100% do ritmo</p>
             <div class="mc-field"><label data-tip="Ritmo × 0,30 × dias restantes (cenário conservador, −70%)">Mínimo</label><input type="number" id="vnMin" value="20000" readonly></div>
             <div class="mc-field" id="vnModeWrap"><label data-tip="Ritmo × 0,65 × dias restantes (ponto médio)">Moda</label><input type="number" id="vnMode" value="21000" readonly></div>
             <div class="mc-field"><label data-tip="Ritmo × 1,00 × dias restantes (cenário positivo)">Máximo</label><input type="number" id="vnMax" value="24000" readonly></div>
@@ -631,6 +632,7 @@ var SHEET_MAP = {
   atrasados: { card: 'rec',  kw: ['atrasado'] },
   saldo:     { card: 'rec',  kw: ['saldo em conta', 'saldo'] },
   sicredi:   { card: 'rec',  kw: ['sicredi'] },
+  vendas_avista: { card: 'rec', kw: ['vendas'] },   /* opcional: se a ponte não tiver a linha, vale o valor digitado */
   paga:      { card: 'desp', kw: ['paga'] },
   apagar:    { card: 'desp', kw: ['a pagar'] }
 };
@@ -754,6 +756,23 @@ function ensureSicrediLine() {
   list.appendChild(row);
 }
 
+/* garante a linha "Vendas à vista no mês" (logo após Caixa gerado) para dados já salvos no localStorage */
+function ensureVendasLine() {
+  var rec = document.querySelector('.fincard.rec');
+  if (!rec || findLine(rec, 'vendas_avista', ['vendas'])) return;
+  var list = rec.querySelector('.linelist');
+  if (!list) return;
+  var row = document.createElement('div');
+  row.className = 'line';
+  row.setAttribute('data-role', 'vendas_avista');
+  row.innerHTML = '<button class="del ctrl" onclick="delLine(this)">&#215;</button>' +
+    '<div class="lbl"><span contenteditable="true">Vendas à vista no mês</span>' +
+    '<span class="sub" contenteditable="true">total vendido à vista pelo comercial · base do ritmo de vendas</span></div>' +
+    '<div class="val" contenteditable="true">R$ 0,00</div>';
+  var caixaLn = findLine(rec, 'caixa', ['caixa gerado', 'caixa']);
+  list.insertBefore(row, caixaLn ? caixaLn.nextSibling : list.firstChild);
+}
+
 var MC_TEMPLATE = null;   /* HTML original do Monte Carlo (capturado do seed antes do restore) */
 function showApp() {
   document.getElementById('login-screen').classList.add('hidden');
@@ -765,6 +784,7 @@ function showApp() {
   ensurePosSection();   /* cria o "Cenário positivo" no lugar do Monte Carlo (que vai para o fim) */
   migrateWording();     /* corrige textos "semana" -> "mês" em dados salvos */
   ensureSicrediLine();  /* adiciona a linha "Sicredi Invest" se ainda não existir */
+  ensureVendasLine();   /* adiciona a linha "Vendas à vista no mês" se ainda não existir */
   bindEvents();
   recalc();
   setTimeout(runMC, 80);
@@ -830,14 +850,14 @@ function setLineSub(ln, text) {
 /* reconstrói o layout da seção Projeção (migra automaticamente dados antigos do localStorage) */
 function ensureProjLayout() {
   var proj = document.querySelector('.proj');
-  if (!proj || proj.getAttribute('data-layout') === '14') return;
-  proj.setAttribute('data-layout', '14');
+  if (!proj || proj.getAttribute('data-layout') === '15') return;
+  proj.setAttribute('data-layout', '15');
   proj.innerHTML =
     '<div class="drivers">' +
       '<div class="driver"><label>Dias úteis do mês</label><input id="pTotal" readonly></div>' +
       '<div class="driver"><label>Decorridos</label><input id="pDecorr" readonly></div>' +
       '<div class="driver"><label>Restantes</label><input id="pDias" readonly></div>' +
-      '<div class="driver"><label>Ritmo diário de receita</label><input id="pRitmoRec" readonly></div>' +
+      '<div class="driver"><label>Ritmo diário de vendas</label><input id="pRitmoRec" readonly></div>' +
     '</div>' +
     '<div class="projgrid">' +
       '<div class="projrow"><span class="pk">Saldo em conta hoje <small>(informado)</small></span><span class="pv" id="cascSaldo">—</span></div>' +
@@ -911,9 +931,9 @@ function ensurePosLayout() {
 function ensureMCLayout() {
   /* troca qualquer layout salvo antigo pelo atual (Recursividade + Vendas Novas automáticas pela planilha) */
   var box = document.querySelector('.mc-box');
-  if (!box || box.getAttribute('data-layout') === 'auto1') return;
+  if (!box || box.getAttribute('data-layout') === 'auto2') return;
   if (MC_TEMPLATE) box.innerHTML = MC_TEMPLATE;
-  box.setAttribute('data-layout', 'auto1');
+  box.setAttribute('data-layout', 'auto2');
 }
 
 /* localiza o parágrafo da seção "Observações" (pelo título, robusto ao localStorage) */
@@ -1024,15 +1044,16 @@ function recalc() {
     var restantes = bizDaysFrom(y, mo, splitDay);  /* dias úteis restantes; diminui a cada dia útil */
     var decorr    = totalDU - restantes;           /* dias úteis já concluídos */
 
-    /* ritmo diário de receita = caixa ÷ dias úteis decorridos (exibido cheio) */
+    /* ritmo diário de vendas = vendas à vista do mês (comercial) ÷ dias úteis decorridos (exibido cheio) */
     var monthName = new Date(y, mo, 1).toLocaleDateString('pt-BR', {month: 'long'});
-    var ritmoRec = caixa / Math.max(decorr, 1);
-    if (!isFinite(ritmoRec)) ritmoRec = 0;
+    var vendasMes = lineVal(rec, 'vendas_avista', ['vendas']);
+    var ritmoVendas = vendasMes / Math.max(decorr, 1);
+    if (!isFinite(ritmoVendas)) ritmoVendas = 0;
 
     /* Saldo de caixa projetado (cascata):
        Saldo (informado) + Recebíveis (A receber −15%) + Vendas novas (ritmo −70% × restantes) − A pagar */
     var receberNet = receber * (1 - INAD);
-    var vendasProj = ritmoRec * PROJ_FATOR * restantes;
+    var vendasProj = ritmoVendas * PROJ_FATOR * restantes;
     var resultMes  = saldo + receberNet + vendasProj - aPagar;
     if (!isFinite(resultMes)) resultMes = 0;
 
@@ -1044,7 +1065,7 @@ function recalc() {
     setField('pTotal',     String(totalDU));
     setField('pDecorr',    String(decorr));
     setField('pDias',      String(restantes));
-    setField('pRitmoRec',  fmtBR(ritmoRec));
+    setField('pRitmoRec',  fmtBR(ritmoVendas));
 
     setCasc('cascSaldo',   saldo);
     setCasc('cascReceber', receberNet);
@@ -1054,14 +1075,14 @@ function recalc() {
 
     /* Cenário positivo: A receber −5% + vendas novas no ritmo atual (sem corte) até o fim do mês */
     var receberPos = receber * (1 - INAD_POS);
-    var vendasPos  = ritmoRec * restantes;
+    var vendasPos  = ritmoVendas * restantes;
     var receitaPos = caixa + receberPos + vendasPos;
     var despesaMes = pagaVal + aPagar;
     var lucroPos   = receitaPos - despesaMes;
     var margemPos  = receitaPos > 0 ? lucroPos / receitaPos * 100 : 0;
     var caixaPos   = saldo + receberPos + vendasPos - aPagar;
     ensurePosLayout();
-    setField('posRitmo', fmtBR(ritmoRec));
+    setField('posRitmo', fmtBR(ritmoVendas));
     setField('posDias',  String(restantes));
     setField('posInad',  fmtBR(INAD_POS * 100, 0) + '%');
     setCasc('posCaixa',    caixa);
@@ -1080,11 +1101,11 @@ function recalc() {
     if (posDelta) posDelta.innerHTML = 'fim de ' + monthName + ' · <span class="delta">' + sig(caixaPos - resultMes) + ' vs. cenário conservador</span>';
     var posNote = document.getElementById('posNote');
     if (posNote) posNote.textContent =
-      'Cenário positivo: inadimplência de 5% sobre o A receber e vendas novas mantendo o ritmo diário atual (Caixa ÷ dias úteis decorridos) em todos os dias úteis restantes, sem desconto. Lucro = receita do mês (Caixa gerado + recebíveis + vendas novas) − despesas do mês (Paga + A pagar).';
+      'Cenário positivo: inadimplência de 5% sobre o A receber e vendas novas mantendo o ritmo diário atual (vendas à vista do mês ÷ dias úteis decorridos) em todos os dias úteis restantes, sem desconto. Lucro = receita do mês (Caixa gerado + recebíveis + vendas novas) − despesas do mês (Paga + A pagar).';
 
     var projNote = document.getElementById('projNote');
     if (projNote) projNote.textContent =
-      'Saldo de caixa projetado no fim do mês = Saldo em conta (informado) + A receber (−15% inadimplência) + ritmo diário (Caixa ÷ dias decorridos) × 0,30 (−70%) × dias úteis restantes − A pagar. Atrasados fica fora da conta.';
+      'Saldo de caixa projetado no fim do mês = Saldo em conta (informado) + A receber (−15% inadimplência) + ritmo diário (vendas à vista do mês ÷ dias decorridos) × 0,30 (−70%) × dias úteis restantes − A pagar. Atrasados fica fora da conta.';
 
     /* destaque (hero) = saldo de caixa projetado */
     var heroVal = resultMes;
@@ -1097,7 +1118,10 @@ function recalc() {
     var badge = document.querySelector('.hero .badge span');
     if (badge) { lockCalc(badge); badge.textContent = resultMes >= 0 ? 'Positiva' : 'Negativa'; }
 
-    setLineSub(findLine(rec,  'caixa',     ['caixa gerado', 'caixa']),   'entrou de fato no mês · base do ritmo diário');
+    setLineSub(findLine(rec,  'caixa',     ['caixa gerado', 'caixa']),   'entrou de fato no mês');
+    setLineSub(findLine(rec,  'vendas_avista', ['vendas']),
+      vendasMes > 0 ? 'total vendido à vista pelo comercial · ritmo R$ ' + fmtBR(ritmoVendas) + '/dia útil'
+                    : '⚠ preencha (✎ Editar) o total vendido à vista no mês · sem ele as vendas projetadas ficam zeradas');
     setLineSub(findLine(rec,  'receber',   ['a receber', 'receber']),    'títulos a vencer · considera −15% de inadimplência');
     setLineSub(findLine(rec,  'atrasados', ['atrasado']),                'títulos vencidos e ainda não pagos · fora da projeção');
     setLineSub(findLine(rec,  'saldo',     ['saldo em conta', 'saldo']), 'quanto você tem em conta hoje');
@@ -1113,7 +1137,7 @@ function recalc() {
         ? 'a posição de hoje já é superavitária em R$ ' + fmtBR(posicao)
         : (deficit > 0 ? 'a posição de hoje tem déficit de R$ ' + fmtBR(deficit) : 'a posição de hoje está equilibrada');
       obsP.textContent =
-        diasTxt + ' em ' + monthName + '. Ritmo diário real R$ ' + fmtBR(ritmoRec) + '. ' +
+        diasTxt + ' em ' + monthName + '. Ritmo diário de vendas à vista R$ ' + fmtBR(ritmoVendas) + '. ' +
         'Resultado projetado (A receber −15% + ritmo × 0,30 × dias restantes + Saldo − A pagar): ' + sig(resultMes) + '. ' +
         'Posição de hoje: ' + posTxt + '.';
     }
@@ -1124,7 +1148,7 @@ function recalc() {
     var mcFaltaVal = Math.max(Math.round(aPagar - saldo), 0);
     var mcVals = {
       rdMin: receber * (1 - INAD), rdMode: receber * 0.90, rdMax: receber * (1 - INAD_POS),
-      vnMin: ritmoRec * PROJ_FATOR * restantes, vnMode: ritmoRec * 0.65 * restantes, vnMax: ritmoRec * restantes,
+      vnMin: ritmoVendas * PROJ_FATOR * restantes, vnMode: ritmoVendas * 0.65 * restantes, vnMax: ritmoVendas * restantes,
       mcFalta: mcFaltaVal
     };
     for (var mk in mcVals) setField(mk, String(Math.round(mcVals[mk])));
