@@ -179,6 +179,7 @@ html[data-snapshot] #btnRefresh{display:none}
 .recbtn:hover{background:var(--navy2)}
 .proj.pos{border-color:#bfe6d3;background:#f7fcf9}
 .proj.pos .driver{background:#eef8f3;border-color:#d3eee1}
+.proj.pos .projrow:not(.total) .pk{padding-left:14px;font-weight:500}
 .projsub{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--green);margin:20px 0 2px}
 .projrow.total .pk{color:var(--ink)}
 .projrow.total{border-bottom:2px solid var(--line)}
@@ -900,31 +901,17 @@ function ensurePosSection() {
 /* monta o conteúdo da seção "Cenário positivo" */
 function ensurePosLayout() {
   var box = document.getElementById('posBox');
-  if (!box || box.getAttribute('data-layout') === 'pos1') return;
-  box.setAttribute('data-layout', 'pos1');
+  if (!box || box.getAttribute('data-layout') === 'pos2') return;
+  box.setAttribute('data-layout', 'pos2');
   box.innerHTML =
-    '<div class="drivers">' +
-      '<div class="driver"><label>Ritmo diário mantido</label><input id="posRitmo" readonly></div>' +
-      '<div class="driver"><label>Dias úteis restantes</label><input id="posDias" readonly></div>' +
-      '<div class="driver"><label>Inadimplência</label><input id="posInad" readonly></div>' +
-    '</div>' +
-    '<div class="projsub">Lucratividade do mês</div>' +
     '<div class="projgrid">' +
-      '<div class="projrow"><span class="pk">Receita já realizada <small>(Caixa gerado)</small></span><span class="pv" id="posCaixa">—</span></div>' +
-      '<div class="projrow"><span class="pk">Recebíveis a entrar <small>(A receber −5%)</small></span><span class="pv" id="posReceber">—</span></div>' +
-      '<div class="projrow"><span class="pk">Vendas novas projetadas <small>(ritmo atual × dias restantes)</small></span><span class="pv" id="posVendas">—</span></div>' +
-      '<div class="projrow total"><span class="pk">Receita projetada do mês</span><span class="pv" id="posReceita">—</span></div>' +
-      '<div class="projrow"><span class="pk">Despesas do mês <small>(Paga + A pagar)</small></span><span class="pv" id="posDespesa">—</span></div>' +
+      '<div class="projrow total"><span class="pk">Receitas</span><span class="pv" id="posReceitas">—</span></div>' +
+      '<div class="projrow"><span class="pk">Saldo em conta</span><span class="pv" id="posSaldo">—</span></div>' +
+      '<div class="projrow"><span class="pk">A receber <small>−5% inadimplência</small></span><span class="pv" id="posReceber">—</span></div>' +
+      '<div class="projrow"><span class="pk">Vendas novas <small id="posVendasSub">—</small></span><span class="pv" id="posVendas">—</span></div>' +
+      '<div class="projrow total"><span class="pk">Despesas a pagar</span><span class="pv" id="posPagar">—</span></div>' +
     '</div>' +
-    '<div class="result"><div class="rl"><span>Lucro projetado do mês</span><small id="posMargem">—</small></div><div class="rv" id="posLucro">—</div></div>' +
-    '<div class="projsub">Caixa no fechamento</div>' +
-    '<div class="projgrid">' +
-      '<div class="projrow"><span class="pk">Saldo em conta hoje <small>(informado)</small></span><span class="pv" id="posSaldo">—</span></div>' +
-      '<div class="projrow"><span class="pk">Recebíveis + vendas novas <small>(cenário positivo)</small></span><span class="pv" id="posEntradas">—</span></div>' +
-      '<div class="projrow"><span class="pk">Contas a pagar</span><span class="pv" id="posPagar">—</span></div>' +
-    '</div>' +
-    '<div class="result"><div class="rl"><span>Saldo de caixa projetado</span><small id="posDelta">—</small></div><div class="rv" id="posCaixaFim">—</div></div>' +
-    '<div class="projnote" id="posNote"></div>';
+    '<div class="result"><div class="rl"><span>Resultado no fim do mês</span><small>receitas − despesas a pagar</small></div><div class="rv" id="posResultado">—</div></div>';
 }
 
 /* migração do Monte Carlo: devolve o layout original (3 fontes) se veio o redesenhado do localStorage */
@@ -1076,32 +1063,16 @@ function recalc() {
     /* Cenário positivo: A receber −5% + vendas novas no ritmo atual (sem corte) até o fim do mês */
     var receberPos = receber * (1 - INAD_POS);
     var vendasPos  = ritmoVendas * restantes;
-    var receitaPos = caixa + receberPos + vendasPos;
-    var despesaMes = pagaVal + aPagar;
-    var lucroPos   = receitaPos - despesaMes;
-    var margemPos  = receitaPos > 0 ? lucroPos / receitaPos * 100 : 0;
-    var caixaPos   = saldo + receberPos + vendasPos - aPagar;
+    var receitasPos = saldo + receberPos + vendasPos;
     ensurePosLayout();
-    setField('posRitmo', fmtBR(ritmoVendas));
-    setField('posDias',  String(restantes));
-    setField('posInad',  fmtBR(INAD_POS * 100, 0) + '%');
-    setCasc('posCaixa',    caixa);
+    setCasc('posReceitas', receitasPos);
+    setCasc('posSaldo',    saldo);
     setCasc('posReceber',  receberPos);
     setCasc('posVendas',   vendasPos);
-    setCasc('posReceita',  receitaPos);
-    setCasc('posDespesa',  -despesaMes);
-    setRV('posLucro', lucroPos);
-    var posMargem = document.getElementById('posMargem');
-    if (posMargem) posMargem.textContent = 'margem de ' + fmtBR(margemPos, 1) + '% sobre a receita projetada';
-    setCasc('posSaldo',    saldo);
-    setCasc('posEntradas', receberPos + vendasPos);
     setCasc('posPagar',    -aPagar);
-    setRV('posCaixaFim', caixaPos);
-    var posDelta = document.getElementById('posDelta');
-    if (posDelta) posDelta.innerHTML = 'fim de ' + monthName + ' · <span class="delta">' + sig(caixaPos - resultMes) + ' vs. cenário conservador</span>';
-    var posNote = document.getElementById('posNote');
-    if (posNote) posNote.textContent =
-      'Cenário positivo: inadimplência de 5% sobre o A receber e vendas novas mantendo o ritmo diário atual (vendas à vista do mês ÷ dias úteis decorridos) em todos os dias úteis restantes, sem desconto. Lucro = receita do mês (Caixa gerado + recebíveis + vendas novas) − despesas do mês (Paga + A pagar).';
+    setRV('posResultado', receitasPos - aPagar);
+    var posVendasSub = document.getElementById('posVendasSub');
+    if (posVendasSub) posVendasSub.textContent = 'R$ ' + fmtBR(ritmoVendas) + '/dia × ' + restantes + (restantes === 1 ? ' dia restante' : ' dias restantes');
 
     var projNote = document.getElementById('projNote');
     if (projNote) projNote.textContent =

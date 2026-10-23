@@ -14,7 +14,7 @@ Os números dos cards **Receita** e **Despesa** (7 fixos + `vendas_avista` opcio
 Ordem das seções e o que cada uma deriva dos cards. **Ritmo diário de vendas = Vendas à vista no mês ÷ dias úteis decorridos** (não usa o Caixa gerado). A linha "Vendas à vista no mês" vem da chave opcional `vendas_avista` da ponte; se a ponte não tiver essa chave, vale o valor digitado à mão (✎ Editar), e enquanto estiver zerada as vendas projetadas ficam em zero.
 
 - **Projeção (conservadora)** — Saldo + A receber −15% + ritmo × 0,30 × dias restantes − A pagar.
-- **Cenário positivo** — A receber −5% e vendas novas no ritmo de vendas à vista (100%) até o fim do mês. Mostra o lucro do mês (Caixa gerado + recebíveis + vendas novas − Paga − A pagar, com margem) e o saldo de caixa projetado.
+- **Cenário positivo** — Receitas (Saldo em conta + A receber −5% + vendas novas no ritmo de vendas à vista × dias restantes) − Despesas a pagar = resultado no fim do mês.
 - **Observações**.
 - **Monte Carlo** — sem campos manuais: Recursividade = A receber × 0,85 / 0,90 / 0,95 (mín / moda / máx); Vendas Novas = ritmo × 0,30 / 0,65 / 1,00 × dias restantes; Falta a cobrir = A pagar − Saldo em conta. A probabilidade de cobrir a falta equivale à chance de fechar o mês com caixa ≥ 0. Re-simula sempre que a planilha muda algum desses valores.
 
