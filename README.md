@@ -9,14 +9,14 @@ As páginas compartilham a mesma senha (sessão vale para as duas) e têm links 
 
 ## Relatório ao vivo (`index.html`)
 
-Os números dos cards **Receita** e **Despesa** (7 fixos + `vendas_avista` opcional) são carregados automaticamente de uma planilha Google Sheets publicada em CSV; todo o resto (projeções, Monte Carlo, observações) é calculado no próprio navegador.
+Os números dos cards **Receita** e **Despesa** (7 fixos + `vendas_avista`) são carregados automaticamente de uma planilha Google Sheets publicada em CSV; todo o resto (projeções, Monte Carlo, observações) é calculado no próprio navegador.
 
-Ordem das seções e o que cada uma deriva dos cards. **Ritmo diário de vendas = Vendas à vista no mês ÷ dias úteis decorridos** (não usa o Caixa gerado). A linha "Vendas à vista no mês" vem da chave opcional `vendas_avista` da ponte; se a ponte não tiver essa chave, vale o valor digitado à mão (✎ Editar), e enquanto estiver zerada as vendas projetadas ficam em zero.
+Ordem das seções e o que cada uma deriva dos cards. **Ritmo diário de vendas = Vendas à vista no mês ÷ dias úteis decorridos** (não usa o Caixa gerado). A linha "Vendas à vista no mês" vem da chave `vendas_avista` da ponte. **Sem dado nunca vira zero:** se a ponte não trouxer a chave (linha ausente ou célula vazia), ou trouxer **0 depois do 3º dia útil** (suspeito — o IMPORTRANGE devolve 0 quando DATA/VALOR estão no formato errado), a linha mostra "—", as vendas novas aparecem como **"sem dado"** e fora da conta, e um banner amarelo avisa no topo da página.
 
 - **Projeção (conservadora)** — Saldo + A receber −15% + ritmo × 0,30 × dias restantes − A pagar.
-- **Cenário positivo** — Receitas (Saldo em conta + A receber −5% + vendas novas no ritmo de vendas à vista × dias restantes) − Despesas a pagar = resultado no fim do mês.
-- **Observações**.
-- **Monte Carlo** — sem campos manuais: Recursividade = A receber × 0,85 / 0,90 / 0,95 (mín / moda / máx); Vendas Novas = ritmo × 0,30 / 0,65 / 1,00 × dias restantes; Falta a cobrir = A pagar − Saldo em conta. A probabilidade de cobrir a falta equivale à chance de fechar o mês com caixa ≥ 0. Re-simula sempre que a planilha muda algum desses valores.
+- **Cenário positivo** — Receitas (Saldo em conta + A receber −5% + vendas novas no ritmo de vendas à vista × dias restantes) − Despesas a pagar = saldo de caixa no fim do mês (é caixa, não lucro). A seção é criada uma vez em dados salvos antigos; se for removida, não volta.
+- **Observações** — resumo gerado pelo cálculo. Se o cálculo falhar, aparece um banner vermelho no topo e as Observações dizem "Projeção indisponível" (o erro vai para o console).
+- **Monte Carlo** — sem campos manuais: Recursividade = A receber × 0,85 / 0,90 / 0,95 (mín / moda / máx); Vendas Novas = ritmo × 0,30 / 0,65 / 1,00 × dias restantes; Falta a cobrir = A pagar − Saldo em conta. A probabilidade de cobrir a falta equivale à chance de fechar o mês com caixa ≥ 0. Re-simula sempre que a planilha muda algum desses valores. A comparação Base × Pessimista foi removida (com os campos automáticos os dois cenários saíam iguais); cenários salvos antigos são apagados do localStorage.
 
 ## Fonte de dados: a ponte "relatorio-api"
 
@@ -33,7 +33,7 @@ O relatório **não** lê a planilha Financeiro 2026 diretamente. Ele lê uma pl
 | `paga` | | Despesa paga no mês |
 | `apagar` | | Despesa a pagar no mês |
 | `saldo_inicial_mes` | | usada por outras integrações — **ignorada** pelo relatório |
-| `vendas_avista` | | *opcional* — total vendido à vista no mês (Comercial - Base de Dados, aba `BI Comercial `, MODAL = "À vista") |
+| `vendas_avista` | | total vendido à vista no mês (ausente/vazia = "sem dado") (Comercial - Base de Dados, aba `BI Comercial `, MODAL = "À vista") |
 
 Fórmula sugerida para `vendas_avista` (col. B; locale pt-BR, separador `;`). Na primeira vez o Sheets pede para clicar em **Permitir acesso** ao IMPORTRANGE:
 
@@ -41,7 +41,7 @@ Fórmula sugerida para `vendas_avista` (col. B; locale pt-BR, separador `;`). Na
 =IFERROR(QUERY(IMPORTRANGE("1le9h4diCcpSy_Zr0sjajqynNb4fb_xlkUhbwtnqvGEM";"'BI Comercial '!D2:I");"select sum(Col6) where Col1 >= date '"&TEXT(EOMONTH(TODAY();-1)+1;"yyyy-mm-dd")&"' and Col1 <= date '"&TEXT(EOMONTH(TODAY();0);"yyyy-mm-dd")&"' and Col5 = 'À vista' label sum(Col6) ''";0);0)
 ```
 
-(D = DATA, H = MODAL, I = VALOR. Requer DATA como data e VALOR como número; se a fórmula der 0 com vendas no mês, confira esses formatos.)
+(D = DATA, H = MODAL, I = VALOR. Requer DATA como data e VALOR como número; se a fórmula der 0 com vendas no mês, confira esses formatos — a partir do 3º dia útil o relatório trata esse 0 como "sem dado".)
 
 As fórmulas da ponte replicam os filtros do Looker sobre as abas **Fluxo de Caixa**, **Contas a Receber** e **Contas a Pagar** da Financeiro 2026. O recorte de mês é dinâmico: no dia 1º a ponte passa a refletir o mês novo sozinha, sem intervenção.
 
@@ -59,11 +59,11 @@ Enquanto a URL não for configurada, o relatório funciona como sempre (valores 
 ## Comportamento
 
 - **Ao abrir**: a página carrega instantânea com os últimos valores salvos e, assim que o CSV responde, os 7 números são atualizados, tudo recalcula e o status mostra "Atualizado da planilha em DD/MM HH:MM".
-- **Botão 🔄 Atualizar**: re-busca a planilha sob demanda, sem recarregar a página.
+- **Botão 🔄 Atualizar**: re-busca a planilha sob demanda, sem recarregar a página. Não há re-busca automática com a página aberta (ela sobrescrevia edições manuais, como o Saldo).
 - **Sem conexão / planilha fora do ar**: o relatório abre normalmente com os últimos valores bons (localStorage) e avisa "usando valores locais". Nunca quebra.
-- **Edição manual**: continua funcionando como sempre (botão ✎ Editar). Vale até o próximo carregamento da planilha — a ponte é a fonte de verdade dos 7 números.
+- **Edição manual**: só no modo ✎ Editar (inclusive "Vendas à vista"). Vale até o próximo carregamento da planilha — a ponte é a fonte de verdade. Ao sair do campo o valor é normalizado: `90.000` = noventa mil; `0.150` e `1234.567` são decimais.
 - **↓ Baixar HTML**: o snapshot baixado é um registro histórico **congelado** — ele não re-busca a planilha ao ser aberto (atributo `data-snapshot` no HTML).
-- **Célula vazia ou chave ausente no CSV**: o valor atual do relatório é mantido (fallback).
+- **Célula vazia ou chave ausente no CSV**: o valor atual do relatório é mantido (fallback) — exceto `vendas_avista`, que vira "sem dado".
 
 ## Fechamento mensal (`fechamento.html`)
 

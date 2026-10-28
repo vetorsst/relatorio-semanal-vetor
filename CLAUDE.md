@@ -23,7 +23,7 @@ Origem: parecer de um "conselho" (CFO de PME, estatístico, tech lead, designer 
 
 ### Ponte `relatorio-api` (chaves hoje)
 `caixa`, `receber`, `atrasados`, `saldo`, `sicredi`, `paga`, `apagar`, `saldo_inicial_mes` (ignorada).
-**`vendas_avista` NÃO existe na ponte** — o código passou a depender dela em 23/10 (ver bugs).
+**`vendas_avista`** — o código depende dela desde 23/10; o Pedro cria a linha na ponte. Enquanto faltar (ou vier 0 depois do 3º dia útil), a página mostra "sem dado" + banner (Fase 0).
 
 ### Ponte `fechamento-api`
 1 linha por mês (`2026-01`…`2026-12`), 22 colunas (ver README).
@@ -51,7 +51,7 @@ Origem: parecer de um "conselho" (CFO de PME, estatístico, tech lead, designer 
 - Exames fora do Monte Carlo.
 - Falta a cobrir = A pagar − Saldo.
 
-**Reverter/corrigir (bugs):**
+**Reverter/corrigir (bugs)** — corrigidos na Fase 0 (branch `fix/fase-0-reversao-seletiva`, um commit por item; ver README):
 1. `vendas_avista` ausente na ponte → vendas projetadas = 0 em todos os cenários; valor digitado à mão fica só no localStorage de quem digitou (cada sócio vê outro número). Criar a chave na ponte; se vazia, aviso visível.
 2. `setInterval(carregarPlanilha, 5min)` em `showApp` sobrescreve edições manuais (inclusive Saldo, editável de propósito desde b14183d) sem avisar. Remover ou não sobrescrever campos editados.
 3. "Vendas à vista" sempre editável (classe `.live`), até fora do modo ✎ Editar — qualquer clique muda o número principal. O aviso "preencha (✎ Editar)" está incorreto.
@@ -84,7 +84,7 @@ Origem: parecer de um "conselho" (CFO de PME, estatístico, tech lead, designer 
 
 | Fase | O quê |
 |---|---|
-| 0 | Reversão seletiva do diff de 23/10 (itens "Reverter/corrigir" acima), mantendo os acertos. Criar `vendas_avista` na ponte. Trocar URL do CSV (despublicar/republicar a ponte) e a senha. |
+| 0 | Reversão seletiva do diff de 23/10 (itens "Reverter/corrigir" acima), mantendo os acertos. Criar `vendas_avista` na ponte. ~~Trocar URL do CSV e a senha~~ — **adiado** pelo Pedro em 27/10/2026 (com o site estático e público, URL/hash novos ficariam igualmente expostos no repo; resolver junto com a Fase 5). |
 | 1 | Parâmetros na ponte (`inad`, `fator_vendas`, `vendas_avista`, …); chave obrigatória ausente = erro visível; feriados nacionais + Porto Alegre; mínimo de dias no divisor do ritmo (ou mistura com média de 3 meses); cálculo em funções puras (`calc.js`) com testes `node --test`, sem build. |
 | 2 | Um número só com faixa (conservador–provável–otimista); alerta acionável ("faltam R$ X até dia Y; alavancas: cobrar atrasados, resgatar Sicredi, renegociar A pagar"); remover "Cenário positivo" e card de déficit separado; MC recolhido em "Como calculamos" até ter calibração; vocabulário simples (Entra/Sai/Sobra, Recebíveis); PDF em 1 página. |
 | 3 | Snapshot diário da projeção (data, entradas, parâmetros, projeções) para backtest; `fechamento.html` mostra previsto × realizado, tendência 12 meses, Δ vs. mês anterior, "Mês sem dados ainda" em vez de "—". |
