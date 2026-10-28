@@ -818,8 +818,8 @@ function showApp() {
   bindEvents();
   recalc();
   setTimeout(runMC, 80);
-  carregarPlanilha();   /* async: resolve após o boot; planilha vence o localStorage */
-  setInterval(carregarPlanilha, 5 * 60 * 1000);   /* re-busca a planilha a cada 5 min com a página aberta */
+  carregarPlanilha();   /* async: resolve após o boot; planilha vence o localStorage. Sem re-busca automática:
+                           sobrescreveria edições manuais (ex.: Saldo). Para atualizar: botão 🔄 Atualizar. */
 }
 
 document.getElementById('pwd-input').addEventListener('keydown', function(e) {
