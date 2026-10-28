@@ -180,9 +180,6 @@ html[data-snapshot] #btnRefresh{display:none}
 .proj.pos{border-color:#bfe6d3;background:#f7fcf9}
 .proj.pos .driver{background:#eef8f3;border-color:#d3eee1}
 .proj.pos .projrow:not(.total) .pk{padding-left:14px;font-weight:500}
-.val.live{border-bottom:1.5px dashed var(--amber);cursor:text;padding:0 2px}
-.val.live:focus{background:#fffdf3;box-shadow:0 0 0 2px var(--yellow)}
-@media print{.val.live{border-bottom:none}}
 .projsub{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--green);margin:20px 0 2px}
 .projrow.total .pk{color:var(--ink)}
 .projrow.total{border-bottom:2px solid var(--line)}
@@ -790,17 +787,13 @@ function ensureVendasLine() {
     var caixaLn = findLine(rec, 'caixa', ['caixa gerado', 'caixa']);
     list.insertBefore(row, caixaLn ? caixaLn.nextSibling : list.firstChild);
   }
-  /* valor sempre editável (sem precisar do modo ✎ Editar): digitar recalcula tudo na hora */
+  /* migra dados salvos de 23/10 (campo "sempre editável"): volta a seguir o modo ✎ Editar como os demais */
   var v = row ? row.querySelector('.val') : null;
-  if (v) { v.classList.add('live'); v.setAttribute('contenteditable', 'true'); v.title = 'Clique para digitar o total vendido à vista no mês'; }
-}
-
-/* formata o valor digitado em "Vendas à vista" ao sair do campo (ex.: 90000 -> R$ 90.000,00) */
-function formatLiveVal(e) {
-  var t = e.target;
-  if (!t || !t.classList || !t.classList.contains('live')) return;
-  var n = parseBR(t.textContent);
-  t.textContent = (n < 0 ? '-R$ ' : 'R$ ') + fmtBR(Math.abs(n));
+  if (v && v.classList.contains('live')) {
+    v.classList.remove('live');
+    v.removeAttribute('title');
+    v.setAttribute('contenteditable', document.body.classList.contains('editing') ? 'true' : 'false');
+  }
 }
 
 var MC_TEMPLATE = null;   /* HTML original do Monte Carlo (capturado do seed antes do restore) */
@@ -1224,7 +1217,6 @@ function toggleEdit() {
   var ed = document.body.classList.toggle('editing');
   document.querySelectorAll('[contenteditable]').forEach(function(e) {
     if (e.classList.contains('calc')) return; /* campos derivados não são editáveis */
-    if (e.classList.contains('live')) return; /* "Vendas à vista" fica sempre editável */
     e.setAttribute('contenteditable', ed ? 'true' : 'false');
   });
   document.getElementById('editToggle').textContent = ed ? '\u{1F441} Pré-visualizar' : '✎ Editar';
@@ -1508,11 +1500,6 @@ function bindEvents() {
       if (typeof runMC === 'function') runMC();
     }
   }, true);
-  // "Vendas à vista" (sempre editável): Enter confirma; ao sair, formata como R$.
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && e.target && e.target.classList && e.target.classList.contains('live')) { e.preventDefault(); e.target.blur(); }
-  }, true);
-  document.addEventListener('focusout', formatLiveVal, true);
   // Em qualquer edição: recalcula posição/projeção e agenda salvamento.
   ['input', 'change', 'focusout'].forEach(function(ev) {
     document.addEventListener(ev, recalc, true);
