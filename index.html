@@ -457,7 +457,7 @@ body:not(.editing) .addsection{display:none}
       <div class="eyebrow" contenteditable="true">Leitura</div>
       <h2 contenteditable="true">Observações</h2>
       <div class="obs">
-        <p contenteditable="true">Restam 7 dias úteis e nosso ritmo diário de receita está em R$ 6.398,00. Mantido esse ritmo, o resultado final da semana deve fechar em aproximadamente R$ 20.000,00 positivos, mesmo absorvendo o déficit atual de R$ 21.885,00.</p>
+        <p contenteditable="true">Resumo do mês gerado automaticamente a partir dos números acima.</p>
       </div>
     </div>
 
@@ -1144,7 +1144,14 @@ function recalc() {
     for (var mk in mcVals) setField(mk, String(Math.round(mcVals[mk])));
     var mcSig = JSON.stringify(mcVals);
     if (mcSig !== mcFaltaCache && typeof runMC === 'function') { mcFaltaCache = mcSig; runMC(); }
-  } catch (e) {}
+  } catch (e) {
+    /* não engolir: loga, avisa no topo e não deixa texto antigo nas Observações parecendo atual */
+    console.error('[recalc]', e);
+    setAvisos(['⛔ Erro ao calcular a projeção: os números da página podem estar desatualizados. ' +
+               'Recarregue; se continuar, avise o Pedro (detalhe: ' + (e && e.message ? e.message : e) + ').'], true);
+    try { var obsErr = findObsP(); if (obsErr) obsErr.textContent = 'Projeção indisponível: erro no cálculo (ver aviso no topo).'; }
+    catch (e2) { console.error('[recalc] Observações', e2); }
+  }
 }
 /* ===== LINHAS ===== */
 function addLine(btn) {
