@@ -455,7 +455,7 @@ body:not(.editing) .addsection{display:none}
         <button class="sbtn x" onclick="delSec(this)" title="Remover seção">&#10005;</button>
       </div>
       <div class="eyebrow" contenteditable="true">Cenário positivo</div>
-      <h2 contenteditable="true">Lucratividade mantido o ritmo de vendas</h2>
+      <h2 contenteditable="true">Saldo de caixa no fim do mês, mantido o ritmo de vendas</h2>
       <div class="proj pos" id="posBox"></div>
     </div>
 
@@ -741,7 +741,8 @@ function migrateWording() {
   var reps = [
     ['Relatório Semanal de Caixa', 'Relatório Mensal de Caixa'],
     ['Posição da semana', 'Posição do mês'],
-    ['Quanto ainda entra até fechar a semana', 'Quanto ainda entra até fechar o mês']
+    ['Quanto ainda entra até fechar a semana', 'Quanto ainda entra até fechar o mês'],
+    ['Lucratividade mantido o ritmo de vendas', 'Saldo de caixa no fim do mês, mantido o ritmo de vendas']
   ];
   var els = document.querySelectorAll('.head h1, #sections .eyebrow, #sections h2');
   for (var i = 0; i < els.length; i++) {
@@ -800,7 +801,7 @@ function showApp() {
   if (MC_TEMPLATE === null) { var mb = document.querySelector('.mc-box'); MC_TEMPLATE = mb ? mb.innerHTML : ''; }
   restoreData();
   ensureMCLayout();     /* migra MC redesenhado -> original, se necessário */
-  ensurePosSection();   /* cria o "Cenário positivo" no lugar do Monte Carlo (que vai para o fim) */
+  ensurePosSection();   /* cria o "Cenário positivo" uma vez (respeita remoção pelo usuário) */
   migrateWording();     /* corrige textos "semana" -> "mês" em dados salvos */
   ensureSicrediLine();  /* adiciona a linha "Sicredi Invest" se ainda não existir */
   ensureVendasLine();   /* adiciona a linha "Vendas à vista no mês" se ainda não existir */
@@ -904,9 +905,14 @@ function ensureProjLayout() {
     '<button class="recbtn ctrl" onclick="recalc()">&#8635; Atualizar projeção</button>';
 }
 
-/* garante a seção "Cenário positivo" (dados salvos antigos): entra no lugar do Monte Carlo, que vai para o fim */
+/* garante a seção "Cenário positivo" UMA vez (dados salvos antigos), logo após a Projeção.
+   Se o usuário removeu a seção, não recria (marca vs_pos_criada no localStorage). Não mexe no Monte Carlo. */
 function ensurePosSection() {
-  if (document.getElementById('posBox')) return;
+  var jaCriada = false;
+  try { jaCriada = localStorage.getItem('vs_pos_criada') === '1'; } catch (e) { console.error('[ensurePosSection]', e); }
+  var marca = function () { try { localStorage.setItem('vs_pos_criada', '1'); } catch (e) { console.error('[ensurePosSection]', e); } };
+  if (document.getElementById('posBox')) { marca(); return; }
+  if (jaCriada) return;
   var secs = document.getElementById('sections');
   var addBtn = secs ? secs.querySelector('.addsection') : null;
   if (!secs) return;
@@ -919,23 +925,20 @@ function ensurePosSection() {
     '<button class="sbtn" onclick="moveSec(this,1)" title="Descer">&#8595;</button>' +
     '<button class="sbtn x" onclick="delSec(this)" title="Remover seção">&#10005;</button></div>' +
     '<div class="eyebrow" contenteditable="true">Cenário positivo</div>' +
-    '<h2 contenteditable="true">Lucratividade mantido o ritmo de vendas</h2>' +
+    '<h2 contenteditable="true">Saldo de caixa no fim do mês, mantido o ritmo de vendas</h2>' +
     '<div class="proj pos" id="posBox"></div>';
-  var mcBox = secs.querySelector('.mc-box');
-  var mcSec = mcBox ? mcBox.closest('.section') : null;
   var projBox = secs.querySelector('.proj');
   var projSec = projBox ? projBox.closest('.section') : null;
-  if (mcSec) secs.insertBefore(sec, mcSec);
-  else if (projSec) secs.insertBefore(sec, projSec.nextSibling);
+  if (projSec) secs.insertBefore(sec, projSec.nextSibling);
   else secs.insertBefore(sec, addBtn);
-  if (mcSec) secs.insertBefore(mcSec, addBtn);   /* Monte Carlo vai para depois de tudo */
+  marca();
 }
 
 /* monta o conteúdo da seção "Cenário positivo" */
 function ensurePosLayout() {
   var box = document.getElementById('posBox');
-  if (!box || box.getAttribute('data-layout') === 'pos2') return;
-  box.setAttribute('data-layout', 'pos2');
+  if (!box || box.getAttribute('data-layout') === 'pos3') return;
+  box.setAttribute('data-layout', 'pos3');
   box.innerHTML =
     '<div class="projgrid">' +
       '<div class="projrow total"><span class="pk">Receitas</span><span class="pv" id="posReceitas">—</span></div>' +
@@ -944,7 +947,7 @@ function ensurePosLayout() {
       '<div class="projrow"><span class="pk">Vendas novas <small id="posVendasSub">—</small></span><span class="pv" id="posVendas">—</span></div>' +
       '<div class="projrow total"><span class="pk">Despesas a pagar</span><span class="pv" id="posPagar">—</span></div>' +
     '</div>' +
-    '<div class="result"><div class="rl"><span>Resultado no fim do mês</span><small>receitas − despesas a pagar</small></div><div class="rv" id="posResultado">—</div></div>';
+    '<div class="result"><div class="rl"><span>Saldo de caixa no fim do mês</span><small>receitas − despesas a pagar · é caixa, não lucro</small></div><div class="rv" id="posResultado">—</div></div>';
 }
 
 /* migração do Monte Carlo: devolve o layout original (3 fontes) se veio o redesenhado do localStorage */
