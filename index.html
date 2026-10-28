@@ -206,9 +206,6 @@ html[data-snapshot] #btnRefresh{display:none}
 .mc-field input:focus{border-color:var(--yellow);box-shadow:0 0 0 2px rgba(255,205,28,.2)}
 .mc-field input:disabled{background:#eee;color:var(--muted)}
 .mc-dist-select{width:100%;border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:inherit;font-size:12px;font-weight:600;color:var(--navy);background:#fff;outline:none;cursor:pointer;margin-bottom:8px}
-.mc-savebtn{padding:8px 14px;border-radius:8px;border:1.5px solid var(--line);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;background:#fff;color:var(--muted);transition:.15s;white-space:nowrap}
-.mc-savebtn:hover{border-color:var(--navy);color:var(--navy)}
-.mc-savebtn.saved{border-color:var(--green);color:var(--green)}
 .mc-global{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
 .mc-stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
 .mc-stat{background:#f5f8f9;border:1px solid var(--line);border-radius:10px;padding:11px 14px;text-align:center}
@@ -222,7 +219,6 @@ html[data-snapshot] #btnRefresh{display:none}
 .mc-svg-wrap{width:100%;overflow:hidden;border-radius:8px;margin-bottom:4px}
 .mc-svg-wrap svg{display:block;width:100%;height:160px}
 .mc-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-bottom:14px}
-.mc-compare-hint{font-size:12px;color:var(--muted);background:#f8f9fa;border:1px dashed #cdd5db;border-radius:8px;padding:10px 14px;margin-bottom:14px;text-align:center}
 
 /* ---------- Tooltips ---------- */
 [data-tip]{position:relative;cursor:help}
@@ -242,18 +238,10 @@ html[data-snapshot] #btnRefresh{display:none}
 [data-tip]:hover::after,[data-tip]:hover::before{opacity:1}
 .mc-legend span{display:flex;align-items:center;gap:5px}
 .mc-legend .dot{width:12px;height:3px;border-radius:2px;flex:none}
-.mc-compare{border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:14px;background:#f7f9fa}
-.mc-compare h4{font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px}
-.mc-compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.mc-compare-col{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px}
-.mc-compare-col h5{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
-.mc-compare-stat{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;font-size:12.5px}
-.mc-compare-stat .ck{color:var(--muted);font-weight:500}
-.mc-compare-stat .cv{font-weight:700;font-variant-numeric:tabular-nums}
 .mc-runbtn{background:var(--navy);color:var(--yellow);border:none;border-radius:9px;padding:10px 20px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:.15s}
 .mc-runbtn:hover{background:var(--navy2)}
 @media(max-width:660px){
-  .mc-dist-row,.mc-vars,.mc-global,.mc-compare-grid{grid-template-columns:1fr}
+  .mc-dist-row,.mc-vars,.mc-global{grid-template-columns:1fr}
   .mc-stat-grid{grid-template-columns:1fr 1fr}
   .mc-svg-wrap svg{height:110px}
   input[type=number]{font-size:16px}
@@ -314,7 +302,7 @@ body:not(.editing) .addsection{display:none}
   body.app{padding:0}
   .toolbar,.ctrl,.addline,.addsection,.recbtn,.period-picker{display:none!important}
   .page{box-shadow:none;border-radius:0;max-width:100%;margin:0}
-  .section,.fincard,.mc-var-card,.mc-stat,.mc-compare{break-inside:avoid;page-break-inside:avoid}
+  .section,.fincard,.mc-var-card,.mc-stat{break-inside:avoid;page-break-inside:avoid}
   @page{margin:12mm}
 }
 </style>
@@ -482,7 +470,7 @@ body:not(.editing) .addsection{display:none}
       </div>
       <div class="eyebrow">Simulação</div>
       <h2>Monte Carlo — Recebíveis + Vendas</h2>
-      <div class="mc-box" data-layout="auto2">
+      <div class="mc-box" data-layout="auto3">
 
         <!-- Seletores de distribuição (fora dos cards) -->
         <div class="mc-dist-row">
@@ -531,10 +519,6 @@ body:not(.editing) .addsection{display:none}
           </div>
           <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
             <button class="mc-runbtn" onclick="runMC()">&#9654; Rodar simulação</button>
-            <div style="display:flex;gap:6px">
-              <button class="mc-savebtn" id="btnSaveBase" onclick="saveScenario('base')">&#128190; Salvar como Base</button>
-              <button class="mc-savebtn" id="btnSavePess" onclick="saveScenario('pess')">&#128190; Salvar como Pessimista</button>
-            </div>
           </div>
         </div>
 
@@ -562,29 +546,6 @@ body:not(.editing) .addsection{display:none}
           <span><span class="dot" style="background:var(--red)"></span>Falta</span>
           <span><span class="dot" style="background:var(--navy);opacity:.5"></span>P10 / P90</span>
           <span><span class="dot" style="background:var(--navy)"></span>P50</span>
-        </div>
-
-        <!-- Hint comparação -->
-        <div class="mc-compare-hint" id="mcCompareHint">
-          Configure os valores e rode a simulação. Depois clique <strong>Salvar como Base</strong> ou <strong>Salvar como Pessimista</strong> para comparar os dois cenários.
-        </div>
-
-        <!-- Comparação base × pessimista -->
-        <div class="mc-compare" id="mcCompare" style="display:none">
-          <h4>Comparação: Cenário Base × Pessimista</h4>
-          <div class="mc-svg-wrap" style="margin-bottom:10px"><svg id="mcSvgCmp" viewBox="0 0 600 120" preserveAspectRatio="none"></svg></div>
-          <div class="mc-compare-grid">
-            <div class="mc-compare-col">
-              <h5>Cenário Base</h5>
-              <div class="mc-compare-stat"><span class="ck">P50</span><span class="cv" id="cmpBaseP50">—</span></div>
-              <div class="mc-compare-stat"><span class="ck">P(cobrir)</span><span class="cv" id="cmpBaseProb">—</span></div>
-            </div>
-            <div class="mc-compare-col">
-              <h5>Cenário Pessimista</h5>
-              <div class="mc-compare-stat"><span class="ck">P50</span><span class="cv" id="cmpPessP50">—</span></div>
-              <div class="mc-compare-stat"><span class="ck">P(cobrir)</span><span class="cv" id="cmpPessProb">—</span></div>
-            </div>
-          </div>
         </div>
 
       </div>
@@ -954,9 +915,9 @@ function ensurePosLayout() {
 function ensureMCLayout() {
   /* troca qualquer layout salvo antigo pelo atual (Recursividade + Vendas Novas automáticas pela planilha) */
   var box = document.querySelector('.mc-box');
-  if (!box || box.getAttribute('data-layout') === 'auto2') return;
+  if (!box || box.getAttribute('data-layout') === 'auto3') return;
   if (MC_TEMPLATE) box.innerHTML = MC_TEMPLATE;
-  box.setAttribute('data-layout', 'auto2');
+  box.setAttribute('data-layout', 'auto3');   /* auto3: sem Base × Pessimista */
 }
 
 /* localiza o parágrafo da seção "Observações" (pelo título, robusto ao localStorage) */
@@ -1402,105 +1363,14 @@ function updateUI(st, falta) {
   document.getElementById('mcMax').textContent   = mcFmt(st.max);
 }
 
-var mcLastBase = null;
-var mcLastPess = null;
-var mcLastRun  = null;
-
 function runMC() {
   var n     = Math.min(Math.max(parseInt(document.getElementById('mcN').value) || 10000, 100), 50000);
   var falta = getN('mcFalta');
 
   var res = simulate(n);
   var st  = calcStats(res, falta);
-  mcLastRun = {res: res, st: st};
   updateUI(st, falta);
   drawHisto('mcSvg', res, falta, st, 1);
-}
-
-/* serializa cenários salvos para persistência (res arredondado p/ limitar tamanho) */
-function serializeScenarios() {
-  function pack(s) {
-    if (!s) return null;
-    return { res: s.res.map(function(v) { return Math.round(v); }), st: s.st };
-  }
-  if (!mcLastBase && !mcLastPess) return null;
-  return { base: pack(mcLastBase), pess: pack(mcLastPess) };
-}
-
-function saveScenario(type) {
-  if (!mcLastRun) return;
-  var falta = getN('mcFalta');
-  if (type === 'base') {
-    mcLastBase = mcLastRun;
-    var btn = document.getElementById('btnSaveBase');
-    btn.classList.add('saved');
-    btn.textContent = '✓ Base salvo';
-    setTimeout(function() { btn.classList.remove('saved'); btn.textContent = '💾 Salvar como Base'; }, 2000);
-  } else {
-    mcLastPess = mcLastRun;
-    var btn = document.getElementById('btnSavePess');
-    btn.classList.add('saved');
-    btn.textContent = '✓ Pessimista salvo';
-    setTimeout(function() { btn.classList.remove('saved'); btn.textContent = '💾 Salvar como Pessimista'; }, 2000);
-  }
-  if (mcLastBase && mcLastPess) {
-    document.getElementById('mcCompareHint').style.display = 'none';
-    document.getElementById('mcCompare').style.display = '';
-    document.getElementById('cmpBaseP50').textContent  = mcFmt(mcLastBase.st.p50);
-    document.getElementById('cmpBaseProb').textContent = mcPct(mcLastBase.st.prob);
-    document.getElementById('cmpPessP50').textContent  = mcFmt(mcLastPess.st.p50);
-    document.getElementById('cmpPessProb').textContent = mcPct(mcLastPess.st.prob);
-    drawCompareSvg(falta);
-  }
-  scheduleSave();
-}
-
-function drawCompareSvg(falta) {
-  if (!mcLastBase || !mcLastPess) return;
-  var allRes = mcLastBase.res.concat(mcLastPess.res);
-  allRes.sort(function(a, b) { return a - b; });
-  var mn = allRes[0], mx = allRes[allRes.length - 1], range = mx - mn || 1;
-  var bins = 36, W = 600, H = 120;
-  var bw = W / bins;
-
-  function hist(res) {
-    var c = new Array(bins).fill(0);
-    res.forEach(function(v) {
-      var b = Math.min(bins - 1, Math.floor((v - mn) / range * bins));
-      c[b]++;
-    });
-    return c;
-  }
-  var cB = hist(mcLastBase.res);
-  var cP = hist(mcLastPess.res);
-  var maxC = Math.max.apply(null, cB.concat(cP));
-
-  var paths = '';
-  cB.forEach(function(c, i) {
-    var bh = (c / maxC) * (H - 22);
-    paths += '<rect x="' + (i * bw + 0.5).toFixed(1) + '" y="' + (H - 22 - bh).toFixed(1) +
-      '" width="' + (bw * 0.45).toFixed(1) + '" height="' + bh.toFixed(1) +
-      '" rx="1" fill="#FFCD1C" opacity="0.85"/>';
-  });
-  cP.forEach(function(c, i) {
-    var bh = (c / maxC) * (H - 22);
-    paths += '<rect x="' + (i * bw + bw * 0.5).toFixed(1) + '" y="' + (H - 22 - bh).toFixed(1) +
-      '" width="' + (bw * 0.45).toFixed(1) + '" height="' + bh.toFixed(1) +
-      '" rx="1" fill="#d2433a" opacity="0.6"/>';
-  });
-
-  var xf = ((falta - mn) / range * W).toFixed(1);
-  var line = falta >= mn && falta <= mx
-    ? '<line x1="' + xf + '" y1="0" x2="' + xf + '" y2="' + (H - 22) + '" stroke="#d2433a" stroke-width="2"/>'
-    : '';
-
-  var legend =
-    '<rect x="4" y="4" width="10" height="10" rx="2" fill="#FFCD1C"/>' +
-    '<text x="18" y="13" font-size="9" fill="#092737" font-weight="600">Base</text>' +
-    '<rect x="52" y="4" width="10" height="10" rx="2" fill="#d2433a" opacity="0.6"/>' +
-    '<text x="66" y="13" font-size="9" fill="#092737" font-weight="600">Pessimista</text>';
-
-  document.getElementById('mcSvgCmp').innerHTML = paths + line + legend;
 }
 
 /* ===== EVENTOS E PERSISTÊNCIA ===== */
@@ -1548,8 +1418,7 @@ function persistData() {
       v: 1,
       sections: document.getElementById('sections').innerHTML,
       h1:     h1el ? h1el.innerHTML  : '',
-      foot:   fel  ? fel.innerHTML   : '',
-      mc:     serializeScenarios()
+      foot:   fel  ? fel.innerHTML   : ''
     }));
     var toast = document.getElementById('saveToast');
     if (toast) {
@@ -1574,29 +1443,9 @@ function restoreData() {
     if (d.h1 && h1el) h1el.innerHTML = d.h1;
     var fel = document.querySelector('.foot');
     if (d.foot && fel) fel.innerHTML = d.foot;
-    restoreScenarios(d.mc);
-  } catch(e) {}
-}
-
-/* reconstrói cenários Monte Carlo salvos e o quadro de comparação */
-function restoreScenarios(mc) {
-  if (!mc) return;
-  mcLastBase = mc.base || null;
-  mcLastPess = mc.pess || null;
-  showCompare();
-}
-
-/* mostra o quadro de comparação Base × Pessimista (robusto à reconstrução do layout) */
-function showCompare() {
-  if (!mcLastBase || !mcLastPess) return;
-  var set = function (id, t) { var e = document.getElementById(id); if (e) e.textContent = t; };
-  var hint = document.getElementById('mcCompareHint'); if (hint) hint.style.display = 'none';
-  var cmp = document.getElementById('mcCompare'); if (cmp) cmp.style.display = '';
-  set('cmpBaseP50',  mcFmt(mcLastBase.st.p50));
-  set('cmpBaseProb', mcPct(mcLastBase.st.prob));
-  set('cmpPessP50',  mcFmt(mcLastPess.st.p50));
-  set('cmpPessProb', mcPct(mcLastPess.st.prob));
-  drawCompareSvg(getN('mcFalta'));
+    /* cenários Base × Pessimista salvos (modelo antigo, com Exames): descarta do localStorage */
+    if ('mc' in d) { delete d.mc; localStorage.setItem('vs_report_v1', JSON.stringify(d)); }
+  } catch(e) { console.error('[restoreData]', e); }
 }
 
 /* Login automático — SEMPRE por último, após todas as declarações (var INAD, etc.) */
