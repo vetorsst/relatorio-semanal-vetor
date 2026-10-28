@@ -711,11 +711,7 @@ function carregarPlanilha(manual) {
         var bruto = (cel[1] || '').trim();
         if (!bruto) continue;                         /* célula vazia: mantém valor atual */
         if (document.activeElement === val) continue; /* não sobrescrever célula sendo editada */
-        /* "89.566" (só pontos de milhar, sem decimais) enganaria o parseBR — normaliza antes */
-        if (/^-?\d{1,3}(\.\d{3})+$/.test(bruto.replace(/[^\d.,-]/g, ''))) {
-          bruto = bruto.replace(/\./g, '');
-        }
-        var num = parseBR(bruto);
+        var num = parseBR(normMilhar(bruto));   /* "89.566" (só milhar) enganaria o parseBR */
         val.textContent = (num < 0 ? '-R$ ' : 'R$ ') + fmtBR(Math.abs(num));
         aplicado++;
         if (chave === 'vendas_avista') vendasOk = true;
@@ -825,8 +821,22 @@ function parseBR(s) {
   if (s == null) return 0;
   s = ('' + s).replace(/[^\d,.-]/g, '').trim();
   if (s.indexOf(',') > -1) { s = s.replace(/\./g, '').replace(',', '.'); }
-  else if ((s.match(/\./g) || []).length > 1 || /^-?\d{1,3}\.\d{3}$/.test(s)) { s = s.replace(/\./g, ''); } /* "90.000" = noventa mil */
+  else if ((s.match(/\./g) || []).length > 1) { s = s.replace(/\./g, ''); }
   var n = parseFloat(s); return isNaN(n) ? 0 : n;
+}
+/* "90.000" / "1.234.567" (só pontos de milhar, sem vírgula) = inteiro pt-BR: tira os pontos ANTES do parseBR.
+   "0.150" e "1234.567" não casam (não são milhar) e seguem para o parseBR como decimal. */
+function normMilhar(s) {
+  s = ('' + s).trim();
+  return /^-?[1-9]\d{0,2}(\.\d{3})+$/.test(s.replace(/[^\d.,-]/g, '')) ? s.replace(/\./g, '') : s;
+}
+/* ao sair de um valor dos cards: normaliza o que foi digitado (ex.: 90.000 -> R$ 90.000,00); "—" (sem dado) fica */
+function formatCardVal(e) {
+  var t = e.target;
+  if (!t || !t.classList || !t.classList.contains('val') || !t.closest('.fincard')) return;
+  if (t.classList.contains('calc') || !/\d/.test(t.textContent)) return;
+  var n = parseBR(normMilhar(t.textContent));
+  t.textContent = (n < 0 ? '-R$ ' : 'R$ ') + fmtBR(Math.abs(n));
 }
 function fmtBR(n, dec) {
   if (dec == null) dec = 2;
@@ -1500,6 +1510,8 @@ function bindEvents() {
       if (typeof runMC === 'function') runMC();
     }
   }, true);
+  // Valor digitado nos cards: normaliza ao sair do campo (antes do recalc abaixo).
+  document.addEventListener('focusout', formatCardVal, true);
   // Em qualquer edição: recalcula posição/projeção e agenda salvamento.
   ['input', 'change', 'focusout'].forEach(function(ev) {
     document.addEventListener(ev, recalc, true);
