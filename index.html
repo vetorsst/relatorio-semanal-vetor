@@ -384,6 +384,7 @@ body:not(.editing) .addsection{display:none}
             <div class="line" data-role="vendas_avista"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Vendas à vista no mês</span><span class="sub" contenteditable="true">total vendido à vista pelo comercial · base do ritmo de vendas</span></div><div class="val" contenteditable="true">R$ 0,00</div></div>
             <div class="line" data-role="receber"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">A receber</span><span class="sub" contenteditable="true">títulos em aberto a vencer · considera −15% inadimplência</span></div><div class="val" contenteditable="true">R$ 36.882,76</div></div>
             <div class="line" data-role="atrasados"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Atrasados</span><span class="sub" contenteditable="true">inadimplência da semana</span></div><div class="val" contenteditable="true">R$ 4.640,00</div></div>
+            <div class="line" data-role="saldo_inicial"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Saldo inicial do mês</span><span class="sub" contenteditable="true">preencha no início do mês</span></div><div class="val live" contenteditable="true">R$ 0,00</div></div>
             <div class="line" data-role="saldo"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Saldo em conta</span><span class="sub" contenteditable="true">posição atual</span></div><div class="val" contenteditable="true">R$ 25.043,84</div></div>
             <div class="line" data-role="sicredi"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Sicredi Invest</span><span class="sub" contenteditable="true">aplicação financeira</span></div><div class="val" contenteditable="true">R$ 6.088,04</div></div>
           </div>
@@ -714,6 +715,8 @@ function carregarPlanilha(manual) {
         }
         var num = parseBR(bruto);
         val.textContent = (num < 0 ? '-R$ ' : 'R$ ') + fmtBR(Math.abs(num));
+        if (val.classList.contains('live')) val.setAttribute('data-ym', ymKey()); /* valor da planilha vale p/ o mês atual */
+        val.setAttribute('data-sheet', String(num));  /* último valor da planilha (p/ voltar a ele se o cálculo local for desligado) */
         aplicado++;
       }
       if (!aplicado) throw new Error('CSV sem chaves reconhecidas');
@@ -760,29 +763,53 @@ function ensureSicrediLine() {
   list.appendChild(row);
 }
 
-/* garante a linha "Vendas à vista no mês" (logo após Caixa gerado) para dados já salvos no localStorage */
-function ensureVendasLine() {
+/* garante uma linha de valor mensal no card de Receita (dados antigos do localStorage) e a deixa
+   sempre editável (sem o modo ✎ Editar): digitar recalcula tudo na hora */
+function ensureLiveLine(role, kw, label, title, anchorRole, anchorKw, before) {
   var rec = document.querySelector('.fincard.rec');
   if (!rec) return;
-  var row = findLine(rec, 'vendas_avista', ['vendas']);
+  var row = findLine(rec, role, kw);
   var list = rec.querySelector('.linelist');
   if (!row && list) {
     row = document.createElement('div');
     row.className = 'line';
-    row.setAttribute('data-role', 'vendas_avista');
+    row.setAttribute('data-role', role);
     row.innerHTML = '<button class="del ctrl" onclick="delLine(this)">&#215;</button>' +
-      '<div class="lbl"><span contenteditable="true">Vendas à vista no mês</span>' +
-      '<span class="sub" contenteditable="true">total vendido à vista pelo comercial · base do ritmo de vendas</span></div>' +
+      '<div class="lbl"><span contenteditable="true">' + label + '</span>' +
+      '<span class="sub" contenteditable="true"></span></div>' +
       '<div class="val" contenteditable="true">R$ 0,00</div>';
-    var caixaLn = findLine(rec, 'caixa', ['caixa gerado', 'caixa']);
-    list.insertBefore(row, caixaLn ? caixaLn.nextSibling : list.firstChild);
+    var anchor = findLine(rec, anchorRole, anchorKw);
+    if (anchor) list.insertBefore(row, before ? anchor : anchor.nextSibling);
+    else list.insertBefore(row, list.firstChild);
   }
-  /* valor sempre editável (sem precisar do modo ✎ Editar): digitar recalcula tudo na hora */
   var v = row ? row.querySelector('.val') : null;
-  if (v) { v.classList.add('live'); v.setAttribute('contenteditable', 'true'); v.title = 'Clique para digitar o total vendido à vista no mês'; }
+  if (v) { v.classList.add('live'); v.setAttribute('contenteditable', 'true'); v.title = title; }
 }
 
-/* formata o valor digitado em "Vendas à vista" ao sair do campo (ex.: 90000 -> R$ 90.000,00) */
+function ensureVendasLine() {
+  ensureLiveLine('vendas_avista', ['vendas'], 'Vendas à vista no mês', 'Clique para digitar o total vendido à vista no mês',
+                 'caixa', ['caixa gerado', 'caixa'], false);
+}
+
+function ensureSaldoInicialLine() {
+  ensureLiveLine('saldo_inicial', ['saldo inicial'], 'Saldo inicial do mês', 'Clique para digitar o saldo em conta no 1º dia do mês',
+                 'saldo', ['saldo em conta'], true);
+}
+
+/* "2026-11": mês de referência dos campos mensais (zeram quando o mês vira) */
+function ymKey() { var r = refYM(); return r.y + '-' + pad2(r.m + 1); }
+
+/* zera os campos mensais (.live) preenchidos num mês anterior ao de referência */
+function resetLiveIfNewMonth(card) {
+  var ym = ymKey();
+  card.querySelectorAll('.val.live').forEach(function (v) {
+    var tag = v.getAttribute('data-ym');
+    if (document.activeElement === v) return;
+    if (!tag || tag < ym) { v.textContent = 'R$ 0,00'; v.setAttribute('data-ym', ym); }
+  });
+}
+
+/* formata o valor digitado num campo mensal ao sair do campo (ex.: 90000 -> R$ 90.000,00) */
 function formatLiveVal(e) {
   var t = e.target;
   if (!t || !t.classList || !t.classList.contains('live')) return;
@@ -802,6 +829,7 @@ function showApp() {
   migrateWording();     /* corrige textos "semana" -> "mês" em dados salvos */
   ensureSicrediLine();  /* adiciona a linha "Sicredi Invest" se ainda não existir */
   ensureVendasLine();   /* adiciona a linha "Vendas à vista no mês" se ainda não existir */
+  ensureSaldoInicialLine(); /* adiciona a linha "Saldo inicial do mês" se ainda não existir */
   bindEvents();
   recalc();
   setTimeout(runMC, 80);
@@ -836,17 +864,19 @@ var INAD_POS = 0.05;      /* cenário positivo: inadimplência de 5% sobre o A r
 function findLine(card, role, keywords) {
   if (!card) return null;
   var lines = card.querySelectorAll('.line');
+  /* 1º: data-role exato (evita "Saldo inicial" ser confundido com "Saldo em conta") */
   for (var i = 0; i < lines.length; i++) {
-    var ln = lines[i];
-    var match = ln.getAttribute('data-role') === role;
-    if (!match) {
-      var lbl = ln.querySelector('.lbl span');
-      var name = lbl ? lbl.textContent.trim().toLowerCase() : '';
-      for (var k = 0; k < keywords.length; k++) {
-        if (name.indexOf(keywords[k]) > -1) { match = true; break; }
-      }
+    if (lines[i].getAttribute('data-role') === role) return lines[i];
+  }
+  /* 2º: pelo rótulo, só entre linhas sem data-role (adicionadas à mão) */
+  for (var j = 0; j < lines.length; j++) {
+    var ln = lines[j];
+    if (ln.getAttribute('data-role')) continue;
+    var lbl = ln.querySelector('.lbl span');
+    var name = lbl ? lbl.textContent.trim().toLowerCase() : '';
+    for (var k = 0; k < keywords.length; k++) {
+      if (name.indexOf(keywords[k]) > -1) return ln;
     }
-    if (match) return ln;
   }
   return null;
 }
@@ -999,17 +1029,31 @@ function recalc() {
   try {
     var rec  = document.querySelector('.fincard.rec');
     var desp = document.querySelector('.fincard.desp');
+    if (rec) resetLiveIfNewMonth(rec);   /* virou o mês: saldo inicial e vendas à vista pedem valor novo */
     var caixa     = lineVal(rec,  'caixa',     ['caixa gerado', 'caixa']);
     var pagaVal   = lineVal(desp, 'paga',      ['paga']);
     var receber   = lineVal(rec,  'receber',   ['a receber', 'receber']);
     var atrasados = lineVal(rec,  'atrasados', ['atrasado']);
     var aPagar    = lineVal(desp, 'apagar',    ['a pagar']);
 
-    /* Saldo em conta = valor informado (editável). Destrava o campo caso tenha ficado travado (auto) antes. */
+    /* Saldo em conta: com o saldo inicial do mês preenchido = saldo inicial + caixa gerado − paga (mesma conta da ponte);
+       sem ele, vale o valor da planilha / informado (editável). */
+    var saldoIni = lineVal(rec, 'saldo_inicial', ['saldo inicial']);
     var saldoLn = findLine(rec, 'saldo', ['saldo em conta', 'saldo']);
     var saldoSv = saldoLn ? saldoLn.querySelector('.val') : null;
-    if (saldoSv) { saldoSv.classList.remove('calc'); saldoSv.setAttribute('contenteditable', document.body.classList.contains('editing') ? 'true' : 'false'); }
-    var saldo = saldoSv ? parseBR(saldoSv.textContent) : 0;
+    var saldo;
+    if (saldoIni && saldoSv) {
+      saldo = saldoIni + caixa - pagaVal;
+      lockCalc(saldoSv);
+      saldoSv.textContent = (saldo < 0 ? '-R$ ' : 'R$ ') + fmtBR(Math.abs(saldo));
+    } else {
+      if (saldoSv && saldoSv.classList.contains('calc') && saldoSv.hasAttribute('data-sheet')) {
+        var sv = parseFloat(saldoSv.getAttribute('data-sheet')) || 0;   /* saiu do cálculo local: volta ao valor da planilha */
+        saldoSv.textContent = (sv < 0 ? '-R$ ' : 'R$ ') + fmtBR(Math.abs(sv));
+      }
+      if (saldoSv) { saldoSv.classList.remove('calc'); saldoSv.setAttribute('contenteditable', document.body.classList.contains('editing') ? 'true' : 'false'); }
+      saldo = saldoSv ? parseBR(saldoSv.textContent) : 0;
+    }
 
     /* posição = saldo + a receber (−15%) + atrasados − a pagar */
     var posicao = saldo + receber * (1 - INAD) + atrasados - aPagar;
@@ -1109,10 +1153,14 @@ function recalc() {
     setLineSub(findLine(rec,  'caixa',     ['caixa gerado', 'caixa']),   'entrou de fato no mês');
     setLineSub(findLine(rec,  'vendas_avista', ['vendas']),
       vendasMes > 0 ? 'total vendido à vista pelo comercial · ritmo R$ ' + fmtBR(ritmoVendas) + '/dia útil'
-                    : '⚠ preencha (✎ Editar) o total vendido à vista no mês · sem ele as vendas projetadas ficam zeradas');
+                    : '⚠ preencha (clique no valor) o total vendido à vista no mês · sem ele as vendas projetadas ficam zeradas');
     setLineSub(findLine(rec,  'receber',   ['a receber', 'receber']),    'títulos a vencer · considera −15% de inadimplência');
     setLineSub(findLine(rec,  'atrasados', ['atrasado']),                'títulos vencidos e ainda não pagos · fora da projeção');
-    setLineSub(findLine(rec,  'saldo',     ['saldo em conta', 'saldo']), 'quanto você tem em conta hoje');
+    setLineSub(findLine(rec,  'saldo_inicial', ['saldo inicial']),
+      saldoIni ? 'saldo em conta no 1º dia de ' + monthName
+               : '⚠ preencha (clique no valor) o saldo em conta no 1º dia de ' + monthName);
+    setLineSub(findLine(rec,  'saldo',     ['saldo em conta', 'saldo']),
+      saldoIni ? 'saldo inicial + caixa gerado − paga' : 'quanto você tem em conta hoje (planilha)');
     setLineSub(findLine(desp, 'apagar',    ['a pagar']),                 'compromissos em aberto no mês');
     setLineSub(findLine(desp, 'paga',      ['paga']),                    'já liquidada no mês');
 
@@ -1478,6 +1526,11 @@ function bindEvents() {
     if (e.key === 'Enter' && e.target && e.target.classList && e.target.classList.contains('live')) { e.preventDefault(); e.target.blur(); }
   }, true);
   document.addEventListener('focusout', formatLiveVal, true);
+  // campo mensal digitado: vale para o mês de referência atual (antes do recalc, registrado abaixo)
+  document.addEventListener('input', function (e) {
+    var t = e.target;
+    if (t && t.classList && t.classList.contains('live')) t.setAttribute('data-ym', ymKey());
+  }, true);
   // Em qualquer edição: recalcula posição/projeção e agenda salvamento.
   ['input', 'change', 'focusout'].forEach(function(ev) {
     document.addEventListener(ev, recalc, true);
