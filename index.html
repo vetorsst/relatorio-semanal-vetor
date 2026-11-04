@@ -384,7 +384,6 @@ body:not(.editing) .addsection{display:none}
             <div class="line" data-role="vendas_avista"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Vendas à vista no mês</span><span class="sub" contenteditable="true">total vendido à vista pelo comercial · base do ritmo de vendas</span></div><div class="val" contenteditable="true">R$ 0,00</div></div>
             <div class="line" data-role="receber"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">A receber</span><span class="sub" contenteditable="true">títulos em aberto a vencer · considera −15% inadimplência</span></div><div class="val" contenteditable="true">R$ 36.882,76</div></div>
             <div class="line" data-role="atrasados"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Atrasados</span><span class="sub" contenteditable="true">inadimplência da semana</span></div><div class="val" contenteditable="true">R$ 4.640,00</div></div>
-            <div class="line" data-role="saldo_inicial"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Saldo inicial do mês</span><span class="sub" contenteditable="true">preencha no início do mês</span></div><div class="val live" contenteditable="true">R$ 0,00</div></div>
             <div class="line" data-role="saldo"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Saldo em conta</span><span class="sub" contenteditable="true">posição atual</span></div><div class="val" contenteditable="true">R$ 25.043,84</div></div>
             <div class="line" data-role="sicredi"><button class="del ctrl" onclick="delLine(this)">&#215;</button><div class="lbl"><span contenteditable="true">Sicredi Invest</span><span class="sub" contenteditable="true">aplicação financeira</span></div><div class="val" contenteditable="true">R$ 6.088,04</div></div>
           </div>
@@ -791,15 +790,16 @@ function ensureVendasLine() {
                  'caixa', ['caixa gerado', 'caixa'], false);
 }
 
-function ensureSaldoInicialLine() {
-  ensureLiveLine('saldo_inicial', ['saldo inicial'], 'Saldo inicial do mês', 'Clique para digitar o saldo em conta no 1º dia do mês',
-                 'saldo', ['saldo em conta'], true);
+/* remove a linha "Saldo inicial do mês" (recurso retirado) de dados já salvos no localStorage */
+function removeSaldoInicialLine() {
+  var ln = document.querySelector('.fincard.rec .line[data-role="saldo_inicial"]');
+  if (ln) ln.remove();
 }
 
 /* "2026-11": mês de referência dos campos mensais (zeram quando o mês vira) */
 function ymKey() { var r = refYM(); return r.y + '-' + pad2(r.m + 1); }
 
-/* zera os campos mensais (.live) preenchidos num mês anterior ao de referência */
+/* zera os campos mensais (.live, ex.: vendas à vista) preenchidos num mês anterior ao de referência */
 function resetLiveIfNewMonth(card) {
   var ym = ymKey();
   card.querySelectorAll('.val.live').forEach(function (v) {
@@ -829,7 +829,7 @@ function showApp() {
   migrateWording();     /* corrige textos "semana" -> "mês" em dados salvos */
   ensureSicrediLine();  /* adiciona a linha "Sicredi Invest" se ainda não existir */
   ensureVendasLine();   /* adiciona a linha "Vendas à vista no mês" se ainda não existir */
-  ensureSaldoInicialLine(); /* adiciona a linha "Saldo inicial do mês" se ainda não existir */
+  removeSaldoInicialLine(); /* retira a linha "Saldo inicial do mês" de dados salvos */
   bindEvents();
   recalc();
   setTimeout(runMC, 80);
@@ -864,7 +864,7 @@ var INAD_POS = 0.05;      /* cenário positivo: inadimplência de 5% sobre o A r
 function findLine(card, role, keywords) {
   if (!card) return null;
   var lines = card.querySelectorAll('.line');
-  /* 1º: data-role exato (evita "Saldo inicial" ser confundido com "Saldo em conta") */
+  /* 1º: data-role exato */
   for (var i = 0; i < lines.length; i++) {
     if (lines[i].getAttribute('data-role') === role) return lines[i];
   }
@@ -992,22 +992,46 @@ function bizDays(year, month, untilDay) {
   var d = new Date(year, month, 1), count = 0;
   while (d.getMonth() === month) {
     if (untilDay != null && d.getDate() > untilDay) break;
-    var wd = d.getDay();
-    if (wd !== 0 && wd !== 6) count++;
+    if (isBizDay(d)) count++;
     d.setDate(d.getDate() + 1);
   }
   return count;
 }
 
-/* conta dias úteis (seg–sex) do mês a partir de fromDay (inclusive) até o fim */
+/* conta dias úteis do mês a partir de fromDay (inclusive) até o fim */
 function bizDaysFrom(year, month, fromDay) {
   var d = new Date(year, month, 1), count = 0;
   while (d.getMonth() === month) {
-    var wd = d.getDay();
-    if (wd !== 0 && wd !== 6 && d.getDate() >= fromDay) count++;
+    if (isBizDay(d) && d.getDate() >= fromDay) count++;
     d.setDate(d.getDate() + 1);
   }
   return count;
+}
+
+/* dia útil = seg–sex fora dos feriados nacionais */
+function isBizDay(d) {
+  var wd = d.getDay();
+  return wd !== 0 && wd !== 6 && !isFeriado(d);
+}
+
+/* feriados nacionais: fixos + Sexta-feira Santa (2 dias antes da Páscoa) */
+var FERIADOS_FIXOS = ['01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '11-20', '12-25'];
+function isFeriado(d) {
+  var md = pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  if (FERIADOS_FIXOS.indexOf(md) > -1) return true;
+  var sexta = pascoa(d.getFullYear());
+  sexta.setDate(sexta.getDate() - 2);
+  return d.getMonth() === sexta.getMonth() && d.getDate() === sexta.getDate();
+}
+
+/* domingo de Páscoa (algoritmo de Meeus/Jones/Butcher) */
+function pascoa(y) {
+  var a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;
+  var f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  var h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+  var l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  var mes = Math.floor((h + l - 7 * m + 114) / 31), dia = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(y, mes - 1, dia);
 }
 
 /* preenche um campo derivado (input) e o trava */
@@ -1029,31 +1053,22 @@ function recalc() {
   try {
     var rec  = document.querySelector('.fincard.rec');
     var desp = document.querySelector('.fincard.desp');
-    if (rec) resetLiveIfNewMonth(rec);   /* virou o mês: saldo inicial e vendas à vista pedem valor novo */
+    if (rec) resetLiveIfNewMonth(rec);   /* virou o mês: vendas à vista pede valor novo */
     var caixa     = lineVal(rec,  'caixa',     ['caixa gerado', 'caixa']);
     var pagaVal   = lineVal(desp, 'paga',      ['paga']);
     var receber   = lineVal(rec,  'receber',   ['a receber', 'receber']);
     var atrasados = lineVal(rec,  'atrasados', ['atrasado']);
     var aPagar    = lineVal(desp, 'apagar',    ['a pagar']);
 
-    /* Saldo em conta: com o saldo inicial do mês preenchido = saldo inicial + caixa gerado − paga (mesma conta da ponte);
-       sem ele, vale o valor da planilha / informado (editável). */
-    var saldoIni = lineVal(rec, 'saldo_inicial', ['saldo inicial']);
+    /* Saldo em conta = valor da planilha / informado (editável). Destrava o campo caso tenha ficado travado (calculado) antes. */
     var saldoLn = findLine(rec, 'saldo', ['saldo em conta', 'saldo']);
     var saldoSv = saldoLn ? saldoLn.querySelector('.val') : null;
-    var saldo;
-    if (saldoIni && saldoSv) {
-      saldo = saldoIni + caixa - pagaVal;
-      lockCalc(saldoSv);
-      saldoSv.textContent = (saldo < 0 ? '-R$ ' : 'R$ ') + fmtBR(Math.abs(saldo));
-    } else {
-      if (saldoSv && saldoSv.classList.contains('calc') && saldoSv.hasAttribute('data-sheet')) {
-        var sv = parseFloat(saldoSv.getAttribute('data-sheet')) || 0;   /* saiu do cálculo local: volta ao valor da planilha */
-        saldoSv.textContent = (sv < 0 ? '-R$ ' : 'R$ ') + fmtBR(Math.abs(sv));
-      }
-      if (saldoSv) { saldoSv.classList.remove('calc'); saldoSv.setAttribute('contenteditable', document.body.classList.contains('editing') ? 'true' : 'false'); }
-      saldo = saldoSv ? parseBR(saldoSv.textContent) : 0;
+    if (saldoSv && saldoSv.classList.contains('calc') && saldoSv.hasAttribute('data-sheet')) {
+      var sv = parseFloat(saldoSv.getAttribute('data-sheet')) || 0;   /* estava calculado pelo saldo inicial (removido): volta ao valor da planilha */
+      saldoSv.textContent = (sv < 0 ? '-R$ ' : 'R$ ') + fmtBR(Math.abs(sv));
     }
+    if (saldoSv) { saldoSv.classList.remove('calc'); saldoSv.setAttribute('contenteditable', document.body.classList.contains('editing') ? 'true' : 'false'); }
+    var saldo = saldoSv ? parseBR(saldoSv.textContent) : 0;
 
     /* posição = saldo + a receber (−15%) + atrasados − a pagar */
     var posicao = saldo + receber * (1 - INAD) + atrasados - aPagar;
@@ -1156,11 +1171,7 @@ function recalc() {
                     : '⚠ preencha (clique no valor) o total vendido à vista no mês · sem ele as vendas projetadas ficam zeradas');
     setLineSub(findLine(rec,  'receber',   ['a receber', 'receber']),    'títulos a vencer · considera −15% de inadimplência');
     setLineSub(findLine(rec,  'atrasados', ['atrasado']),                'títulos vencidos e ainda não pagos · fora da projeção');
-    setLineSub(findLine(rec,  'saldo_inicial', ['saldo inicial']),
-      saldoIni ? 'saldo em conta no 1º dia de ' + monthName
-               : '⚠ preencha (clique no valor) o saldo em conta no 1º dia de ' + monthName);
-    setLineSub(findLine(rec,  'saldo',     ['saldo em conta', 'saldo']),
-      saldoIni ? 'saldo inicial + caixa gerado − paga' : 'quanto você tem em conta hoje (planilha)');
+    setLineSub(findLine(rec,  'saldo',     ['saldo em conta', 'saldo']), 'quanto você tem em conta hoje');
     setLineSub(findLine(desp, 'apagar',    ['a pagar']),                 'compromissos em aberto no mês');
     setLineSub(findLine(desp, 'paga',      ['paga']),                    'já liquidada no mês');
 

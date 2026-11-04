@@ -11,8 +11,6 @@ As páginas compartilham a mesma senha (sessão vale para as duas) e têm links 
 
 Os números dos cards **Receita** e **Despesa** (7 fixos + `vendas_avista` opcional) são carregados automaticamente de uma planilha Google Sheets publicada em CSV; todo o resto (projeções, Monte Carlo, observações) é calculado no próprio navegador.
 
-**Campos mensais (preenchidos à mão, sempre editáveis, zeram quando o mês vira):** "Saldo inicial do mês" — quando preenchido, Saldo em conta = saldo inicial + caixa gerado − paga (mesma conta da ponte); vazio, vale o Saldo em conta da planilha. "Vendas à vista no mês" — base do ritmo de vendas (ou chave `vendas_avista` da ponte).
-
 Ordem das seções e o que cada uma deriva dos cards. **Ritmo diário de vendas = Vendas à vista no mês ÷ dias úteis decorridos** (não usa o Caixa gerado). A linha "Vendas à vista no mês" vem da chave opcional `vendas_avista` da ponte; se a ponte não tiver essa chave, vale o valor digitado à mão (✎ Editar), e enquanto estiver zerada as vendas projetadas ficam em zero.
 
 - **Projeção (conservadora)** — Saldo + A receber −15% + ritmo × 0,30 × dias restantes − A pagar.
